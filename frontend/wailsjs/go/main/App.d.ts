@@ -28,6 +28,8 @@ export function IsPortableVersion():Promise<boolean>;
 
 export function ListDir(arg1:string,arg2:string):Promise<Array<Record<string, any>>>;
 
+export function ListPortForwards(arg1:string):Promise<Array<Record<string, any>>>;
+
 export function ListWebdavBackups():Promise<Array<Record<string, any>>>;
 
 export function Mkdir(arg1:string,arg2:string):Promise<void>;
@@ -47,6 +49,10 @@ export function RestoreFromWebdavFile(arg1:string):Promise<Record<string, any>>;
 export function SaveConnection(arg1:main.Connection):Promise<main.Connection>;
 
 export function SaveWebdavConfig(arg1:Record<string, string>):Promise<void>;
+
+export function StartPortForward(arg1:string,arg2:number,arg3:string,arg4:number):Promise<number>;
+
+export function StopPortForward(arg1:string,arg2:number):Promise<void>;
 
 export function SystemInfo(arg1:string):Promise<Record<string, any>>;
 

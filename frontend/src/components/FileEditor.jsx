@@ -28,7 +28,7 @@ function getLanguage(filename) {
   return map[ext] || null;
 }
 
-export default function FileEditor({ file, onSave, onClose }) {
+export default function FileEditor({ file, onSave, onClose, mode = 'modal' }) {
   const [content, setContent] = useState(file.content);
   const [saving, setSaving] = useState(false);
   const [modified, setModified] = useState(false);
@@ -53,113 +53,56 @@ export default function FileEditor({ file, onSave, onClose }) {
   const lang = getLanguage(file.name);
   const ext = (file.name.split('.').pop() || '').toLowerCase();
 
+  const isSplit = mode === 'split';
+
+  const editorBody = (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1, minHeight: 0 }}>{/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isSplit ? '6px 12px' : '24px 24px 16px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>✏️</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14 }}>{file.name}</span>
+          {modified && (
+            <span style={{ fontSize: 11, background: 'var(--yellow-dim)', color: 'var(--yellow)', padding: '2px 8px', borderRadius: 4, fontWeight: 500 }}>未保存</span>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', background: 'var(--bg-3)', padding: '2px 8px', borderRadius: 4 }}>{ext || 'text'}</span>
+          <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving || !modified}>{saving ? '保存中...' : '💾 保存'}</button>
+          {!isSplit && <button className="btn btn-secondary btn-sm" onClick={handleClose}>关闭</button>}
+        </div>
+      </div>
+
+      {/* File path */}
+      <div style={{ padding: '4px 24px 8px', fontSize: 11, color: 'var(--text-4)', fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border)' }}>{file.path}</div>
+
+      {/* Editor */}
+      <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+        <CodeMirror
+          value={content}
+          height="100%"
+          minHeight="200px"
+          theme={oneDark}
+          extensions={lang ? [lang] : []}
+          onChange={handleChange}
+          style={{ fontSize: 14, height: '100%' }}
+          basicSetup={{ lineNumbers: true, highlightActiveLineGutter: true, highlightSpecialChars: true, history: true, foldGutter: true, drawSelection: true, dropCursor: true, allowMultipleSelections: true, indentOnInput: true, syntaxHighlighting: true, bracketMatching: true, closeBrackets: true, autocompletion: true, rectangularSelection: true, crosshairCursor: false, highlightActiveLine: true, highlightSelectionMatches: true, closeBracketsKeymap: true, defaultKeymap: true, searchKeymap: true, historyKeymap: true, foldKeymap: true, completionKeymap: true, lintKeymap: true }}
+        />
+      </div>
+
+      {/* Footer */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 24px', borderTop: '1px solid var(--border)', fontSize: 11, color: 'var(--text-4)', fontFamily: 'var(--font-mono)' }}>
+        <span>{content.split('\n').length} 行 · {new Blob([content]).size} 字节</span>
+        <span>UTF-8 · {lang ? ext.toUpperCase() : 'Text'}</span>
+      </div>
+    </div>
+  );
+
+  if (isSplit) return editorBody;
+
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && handleClose()}>
       <div className="modal modal-xl" style={{ display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
-        {/* Header */}
-        <div className="modal-header" style={{ paddingBottom: 16 }}>
-          <div className="modal-title">
-            <span>✏️</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14 }}>{file.name}</span>
-            {modified && (
-              <span style={{
-                fontSize: 11,
-                background: 'var(--yellow-dim)',
-                color: 'var(--yellow)',
-                padding: '2px 8px',
-                borderRadius: 4,
-                fontWeight: 500,
-              }}>
-                未保存
-              </span>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{
-              fontSize: 11,
-              color: 'var(--text-4)',
-              fontFamily: 'var(--font-mono)',
-              background: 'var(--bg-3)',
-              padding: '2px 8px',
-              borderRadius: 4,
-            }}>
-              {ext || 'text'}
-            </span>
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={handleSave}
-              disabled={saving || !modified}
-            >
-              {saving ? '保存中...' : '💾 保存'}
-            </button>
-            <button className="btn btn-secondary btn-sm" onClick={handleClose}>关闭</button>
-          </div>
-        </div>
-
-        {/* File path */}
-        <div style={{
-          padding: '4px 24px 8px',
-          fontSize: 11,
-          color: 'var(--text-4)',
-          fontFamily: 'var(--font-mono)',
-          borderBottom: '1px solid var(--border)',
-        }}>
-          {file.path}
-        </div>
-
-        {/* Editor */}
-        <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
-          <CodeMirror
-            value={content}
-            height="100%"
-            minHeight="400px"
-            theme={oneDark}
-            extensions={lang ? [lang] : []}
-            onChange={handleChange}
-            style={{ fontSize: 14, height: '100%' }}
-            basicSetup={{
-              lineNumbers: true,
-              highlightActiveLineGutter: true,
-              highlightSpecialChars: true,
-              history: true,
-              foldGutter: true,
-              drawSelection: true,
-              dropCursor: true,
-              allowMultipleSelections: true,
-              indentOnInput: true,
-              syntaxHighlighting: true,
-              bracketMatching: true,
-              closeBrackets: true,
-              autocompletion: true,
-              rectangularSelection: true,
-              crosshairCursor: false,
-              highlightActiveLine: true,
-              highlightSelectionMatches: true,
-              closeBracketsKeymap: true,
-              defaultKeymap: true,
-              searchKeymap: true,
-              historyKeymap: true,
-              foldKeymap: true,
-              completionKeymap: true,
-              lintKeymap: true,
-            }}
-          />
-        </div>
-
-        {/* Footer status bar */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '8px 24px',
-          borderTop: '1px solid var(--border)',
-          fontSize: 11,
-          color: 'var(--text-4)',
-          fontFamily: 'var(--font-mono)',
-        }}>
-          <span>{content.split('\n').length} 行 · {new Blob([content]).size} 字节</span>
-          <span>UTF-8 · {lang ? ext.toUpperCase() : 'Text'}</span>
-        </div>
+        {editorBody}
       </div>
     </div>
   );

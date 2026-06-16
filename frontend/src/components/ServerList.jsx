@@ -287,7 +287,7 @@ export default function ServerList({
                   </td>
                   <td style={{ fontWeight: 500, color: 'var(--text-1)' }}>
                     {server.name || server.host}
-                    {connected && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--green)', padding: '2px 4px', background: 'rgba(34,197,94,0.1)', borderRadius: 4 }}>CONN</span>}
+                    {connected && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--green)', padding: '2px 4px', background: 'var(--green-dim)', borderRadius: 4 }}>CONN</span>}
                   </td>
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-2)' }}>
                     {server.host}:{server.port || 22}

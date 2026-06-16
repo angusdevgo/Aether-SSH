@@ -261,6 +261,20 @@ func (a *App) ReadPrivateKeyFile() (string, error) {
 	return string(content), nil
 }
 
+// ── Port Forwarding ──────────────────────────────────────────────
+
+func (a *App) StartPortForward(sessionId string, localPort int, remoteHost string, remotePort int) (int, error) {
+	return a.sshManager.StartPortForward(sessionId, localPort, remoteHost, remotePort)
+}
+
+func (a *App) StopPortForward(sessionId string, localPort int) error {
+	return a.sshManager.StopPortForward(sessionId, localPort)
+}
+
+func (a *App) ListPortForwards(sessionId string) []map[string]interface{} {
+	return a.sshManager.ListPortForwards(sessionId)
+}
+
 // WebDAV Methods
 func (a *App) GetWebdavConfig() map[string]string {
 	return a.configManager.GetWebdavConfig()
@@ -317,10 +331,29 @@ func (pr *downloadProgressReader) Read(p []byte) (int, error) {
 
 // UpdateApp downloads the new exe from the given url, replaces the current running exe, and restarts the app.
 func (a *App) UpdateApp(downloadUrl string, filename string) error {
-	// 1. 发起请求下载新文件
-	resp, err := http.Get(downloadUrl)
+	// 使用自定义 HTTP 客户端，支持系统代理 + 30 秒超时
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+		},
+	}
+
+	// 尝试下载，直连失败则回退到 GitHub 镜像
+	download := func(url string) (*http.Response, error) {
+		req, _ := http.NewRequest("GET", url, nil)
+		req.Header.Set("User-Agent", "AetherSSH-Updater/1.0")
+		return client.Do(req)
+	}
+
+	resp, err := download(downloadUrl)
 	if err != nil {
-		return fmt.Errorf("failed to download update: %w", err)
+		// 直连失败，尝试 GitHub 加速镜像
+		mirrorUrl := "https://ghproxy.com/" + downloadUrl
+		resp, err = download(mirrorUrl)
+		if err != nil {
+			return fmt.Errorf("failed to download update: %w", err)
+		}
 	}
 	defer resp.Body.Close()
 

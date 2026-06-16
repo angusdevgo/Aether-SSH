@@ -54,6 +54,10 @@ export function ListDir(arg1, arg2) {
   return window['go']['main']['App']['ListDir'](arg1, arg2);
 }
 
+export function ListPortForwards(arg1) {
+  return window['go']['main']['App']['ListPortForwards'](arg1);
+}
+
 export function ListWebdavBackups() {
   return window['go']['main']['App']['ListWebdavBackups']();
 }
@@ -92,6 +96,14 @@ export function SaveConnection(arg1) {
 
 export function SaveWebdavConfig(arg1) {
   return window['go']['main']['App']['SaveWebdavConfig'](arg1);
+}
+
+export function StartPortForward(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['StartPortForward'](arg1, arg2, arg3, arg4);
+}
+
+export function StopPortForward(arg1, arg2) {
+  return window['go']['main']['App']['StopPortForward'](arg1, arg2);
 }
 
 export function SystemInfo(arg1) {

@@ -35,6 +35,7 @@ type SSHManager struct {
 	app           *App // reference to App for WebSocket output delivery
 	sessions      map[string]*SessionData
 	probeDeployed map[string]bool // tracks which sessions have probe.sh deployed
+	portForwards  map[string][]*forwardEntry // sessionId -> active forwards
 	mu            sync.Mutex
 }
 
@@ -43,6 +44,39 @@ func NewSSHManager() *SSHManager {
 		sessions:      make(map[string]*SessionData),
 		probeDeployed: make(map[string]bool),
 	}
+}
+
+// removeHostKey removes all known_hosts entries for a given hostname
+func removeHostKey(path string, hostname string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	lines := strings.Split(string(data), "\n")
+	var out []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			out = append(out, line)
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) >= 2 {
+			names := strings.Split(fields[0], ",")
+			match := false
+			for _, name := range names {
+				if name == hostname {
+					match = true
+					break
+				}
+			}
+			if match {
+				continue
+			}
+		}
+		out = append(out, line)
+	}
+	os.WriteFile(path, []byte(strings.Join(out, "\n")+"\n"), 0600)
 }
 
 func (m *SSHManager) Connect(sessionId string, conn Connection) error {
@@ -85,6 +119,7 @@ func (m *SSHManager) Connect(sessionId string, conn Connection) error {
 		hostKeyCallback = ssh.InsecureIgnoreHostKey()
 	}
 
+
 	customHostKeyCallback := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 		err := hostKeyCallback(hostname, remote, key)
 		if err == nil {
@@ -94,6 +129,7 @@ func (m *SSHManager) Connect(sessionId string, conn Connection) error {
 		var keyErr *knownhosts.KeyError
 		if errors.As(err, &keyErr) {
 			if len(keyErr.Want) == 0 {
+				// 未知主机 → 自动信任
 				f, fErr := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY, 0600)
 				if fErr == nil {
 					defer f.Close()
@@ -102,7 +138,18 @@ func (m *SSHManager) Connect(sessionId string, conn Connection) error {
 				}
 				return nil
 			} else {
-				return fmt.Errorf("WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! POSSIBLE MITM ATTACK")
+				// 主机密钥已变更（如重装系统）→ 移除旧记录并自动信任新密钥
+				removeHostKey(knownHostsPath, hostname)
+				f, fErr := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY, 0600)
+				if fErr == nil {
+					defer f.Close()
+					line := knownhosts.Line([]string{hostname}, key)
+					f.WriteString(line + "\n")
+				}
+				if m.ctx != nil {
+					runtime.EventsEmit(m.ctx, "ssh-hostkey-changed", hostname)
+				}
+				return nil
 			}
 		}
 		return err
@@ -315,7 +362,32 @@ func (m *SSHManager) GetTerminalCwd(sessionId string) (string, error) {
 	}
 	port := parts[len(parts)-1]
 
-	cmd := fmt.Sprintf(`PORT=%s; SSHD_PID=$(ss -ntp 2>/dev/null | grep ":$PORT " | grep -oE 'pid=[0-9]+' | cut -d= -f2 | head -n1); [ -z "$SSHD_PID" ] && SSHD_PID=$(netstat -ntp 2>/dev/null | grep ":$PORT " | grep -oE '[0-9]+/sshd' | cut -d/ -f1 | head -n1); if [ -n "$SSHD_PID" ]; then SHELL_PID=$(pgrep -P $SSHD_PID | head -n1); fi; [ -z "$SHELL_PID" ] && SHELL_PID=$(pgrep -u $USER -f "sh|bash|zsh" | tail -n1); if [ -n "$SHELL_PID" ]; then readlink /proc/$SHELL_PID/cwd 2>/dev/null || echo "/"; else echo "/"; fi`, port)
+	cmd := fmt.Sprintf(`PORT=%s
+# 查找该端口对应的 sshd 进程 PID
+SSHD_PID=""
+for tool in "ss -ntp" "netstat -ntp" "lsof -ti :$PORT" "fuser $PORT/tcp 2>/dev/null"; do
+  case "$tool" in
+    ss*) SSHD_PID=$(ss -ntp 2>/dev/null | grep ":$PORT " | grep -oE 'pid=[0-9]+' | cut -d= -f2 | head -n1) ;;
+    netstat*) SSHD_PID=$(netstat -ntp 2>/dev/null | grep ":$PORT " | grep -oE '[0-9]+/sshd' | cut -d/ -f1 | head -n1) ;;
+    lsof*) SSHD_PID=$(lsof -ti :$PORT 2>/dev/null | head -n1) ;;
+    fuser*) SSHD_PID=$(fuser $PORT/tcp 2>/dev/null | tr -d ' ') ;;
+  esac
+  [ -n "$SSHD_PID" ] && break
+done
+
+CWD="/"
+if [ -n "$SSHD_PID" ]; then
+  # 尝试找到 sshd 下第一个 shell 子进程
+  SHELL_PID=$(pgrep -P "$SSHD_PID" 2>/dev/null | head -n1)
+  if [ -n "$SHELL_PID" ]; then
+    CWD=$(readlink /proc/$SHELL_PID/cwd 2>/dev/null)
+  fi
+  # 回退：直接用 sshd 的 cwd（通常为 HOME）
+  [ -z "$CWD" ] && CWD=$(readlink /proc/$SSHD_PID/cwd 2>/dev/null)
+fi
+# 最后回退：尝试从 /etc/passwd 找 HOME
+[ -z "$CWD" ] && CWD=$(getent passwd $USER 2>/dev/null | cut -d: -f6)
+echo "${CWD:-/}"`, port)
 
 	out, err := m.executeCmd(s, cmd)
 	if err != nil {
@@ -453,7 +525,7 @@ cat /proc/net/dev
 echo ---DISKIO2---
 cat /proc/diskstats
 echo ---PROC---
-ps -eo pid,pcpu,rss,comm --sort=-pcpu 2>/dev/null | head -6
+ps -eo pid,pcpu,rss,comm --sort=-pcpu 2>/dev/null | head -21
 echo ---DONE---
 `
 
@@ -1106,6 +1178,108 @@ func (m *SSHManager) DownloadFile(sessionId string, remotePath string, localPath
 	buf := make([]byte, 2*1024*1024) // 2MB buffer
 	_, err = io.CopyBuffer(dst, pr, buf)
 	return err
+}
+
+// ── Port Forwarding ─────────────────────────────────────────────────
+
+type forwardEntry struct {
+	LocalPort  int
+	RemoteHost string
+	RemotePort int
+	listener   net.Listener
+	cancel     chan struct{}
+}
+
+// StartPortForward creates a local TCP listener that tunnels to the remote via SSH.
+// localPort=0 means pick a random free port.
+func (m *SSHManager) StartPortForward(sessionId string, localPort int, remoteHost string, remotePort int) (int, error) {
+	m.mu.Lock()
+	s, ok := m.sessions[sessionId]
+	m.mu.Unlock()
+	if !ok {
+		return 0, fmt.Errorf("session not found")
+	}
+
+	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
+	if err != nil {
+		return 0, fmt.Errorf("cannot listen on port %d: %v", localPort, err)
+	}
+	actualPort := listener.Addr().(*net.TCPAddr).Port
+
+	entry := &forwardEntry{
+		LocalPort:  actualPort,
+		RemoteHost: remoteHost,
+		RemotePort: remotePort,
+		listener:   listener,
+		cancel:     make(chan struct{}),
+	}
+
+	go func() {
+		defer listener.Close()
+		for {
+			select {
+			case <-entry.cancel:
+				return
+			default:
+			}
+			listener.(*net.TCPListener).SetDeadline(time.Now().Add(1 * time.Second))
+			localConn, err := listener.Accept()
+			if err != nil {
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					continue
+				}
+				return
+			}
+			go func() {
+				defer localConn.Close()
+				remoteConn, err := s.Client.Dial("tcp", fmt.Sprintf("%s:%d", remoteHost, remotePort))
+				if err != nil {
+					return
+				}
+				defer remoteConn.Close()
+				go io.Copy(remoteConn, localConn)
+				io.Copy(localConn, remoteConn)
+			}()
+		}
+	}()
+
+	m.mu.Lock()
+	if m.portForwards == nil {
+		m.portForwards = make(map[string][]*forwardEntry)
+	}
+	m.portForwards[sessionId] = append(m.portForwards[sessionId], entry)
+	m.mu.Unlock()
+
+	return actualPort, nil
+}
+
+func (m *SSHManager) StopPortForward(sessionId string, localPort int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	entries := m.portForwards[sessionId]
+	for i, e := range entries {
+		if e.LocalPort == localPort {
+			close(e.cancel)
+			e.listener.Close()
+			m.portForwards[sessionId] = append(entries[:i], entries[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("forward not found on port %d", localPort)
+}
+
+func (m *SSHManager) ListPortForwards(sessionId string) []map[string]interface{} {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var result []map[string]interface{}
+	for _, e := range m.portForwards[sessionId] {
+		result = append(result, map[string]interface{}{
+			"localPort":  e.LocalPort,
+			"remoteHost": e.RemoteHost,
+			"remotePort": e.RemotePort,
+		})
+	}
+	return result
 }
 
 func (m *SSHManager) CompressItem(sessionId string, remotePath string) error {

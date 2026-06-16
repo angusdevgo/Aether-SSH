@@ -13,10 +13,10 @@ import defaultTermBg from '../assets/term_bg.png';
 const TERMINAL_THEMES = {
   'aether': {
     name: 'Aether Default',
-    swatches: ['#22c55e', '#58a6ff', '#bc8cff', '#0d1117'],
+    swatches: ['var(--green)', '#58a6ff', '#bc8cff', '#0d1117'],
     theme: {
-      background: '#00000000', foreground: '#cdd9e5', cursor: '#22c55e',
-      cursorAccent: '#0d1117', selectionBackground: 'rgba(34,197,94,0.20)',
+      background: '#00000000', foreground: '#cdd9e5', cursor: 'var(--green)',
+      cursorAccent: '#0d1117', selectionBackground: 'var(--green-dim)',
       black: '#484f58', red: '#ff7b72', green: '#3fb950', yellow: '#d29922',
       blue: '#58a6ff', magenta: '#bc8cff', cyan: '#39c5cf', white: '#b1bac4',
       brightBlack: '#6e7681', brightRed: '#ffa198', brightGreen: '#56d364',
@@ -658,22 +658,22 @@ export default function Terminal({ sessionId, status, isActive, serverName }) {
               }}
               style={{
                 padding: '2px 8px',
-                background: 'rgba(34, 197, 94, 0.15)',
-                border: '1px solid rgba(34, 197, 94, 0.3)',
+                background: 'var(--green-dim)',
+                border: '1px solid var(--green-glow)',
                 borderRadius: '4px',
-                color: '#22c55e',
+                color: 'var(--green)',
                 fontSize: '11px',
                 cursor: 'pointer',
                 fontFamily: 'inherit',
                 transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => {
-                e.target.style.background = 'rgba(34, 197, 94, 0.25)';
-                e.target.style.borderColor = 'rgba(34, 197, 94, 0.5)';
+                e.target.style.background = 'var(--green-dim)';
+                e.target.style.borderColor = 'var(--green-glow)';
               }}
               onMouseLeave={(e) => {
-                e.target.style.background = 'rgba(34, 197, 94, 0.15)';
-                e.target.style.borderColor = 'rgba(34, 197, 94, 0.3)';
+                e.target.style.background = 'var(--green-dim)';
+                e.target.style.borderColor = 'var(--green-glow)';
               }}
             >
               重新连接

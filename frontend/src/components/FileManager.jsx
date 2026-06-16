@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as AppGo from '../../wailsjs/go/main/App.js';
 import FileEditor from './FileEditor.jsx';
+import { buildRemotePath, canCopyRemotePath } from './fileManagerPaths.js';
 import { useTranslation } from '../i18n.js';
 
 // 格式化文件大小
@@ -64,7 +65,7 @@ function isArchive(name) {
 }
 
 // Context menu component
-function ContextMenu({ pos, item, onClose, onDownload, onEdit, onRename, onDelete, onMkdir, onCompress, onUncompress, t }) {
+function ContextMenu({ pos, item, onClose, onCopyPath, onDownload, onEdit, onRename, onDelete, onMkdir, onCompress, onUncompress, t }) {
   const ref = useRef(null);
   useEffect(() => {
     const handler = (e) => {
@@ -88,6 +89,11 @@ function ContextMenu({ pos, item, onClose, onDownload, onEdit, onRename, onDelet
       {item && !item.isDirectory && (
         <div className="context-menu-item" onClick={onDownload}>
           <span>⬇️</span> {t('下载到本地')}
+        </div>
+      )}
+      {item && canCopyRemotePath(item) && (
+        <div className="context-menu-item" onClick={onCopyPath}>
+          <span>📋</span> {t('复制路径')}
         </div>
       )}
       {item && (
@@ -129,6 +135,7 @@ export default function FileManager({ sessionId, addToast }) {
   const [renamingItem, setRenamingItem] = useState(null);
   const [renameValue, setRenameValue] = useState('');
   const [editFile, setEditFile] = useState(null);      // { path, name, content }
+  const [editMode, setEditMode] = useState(localStorage.getItem('editMode') || 'modal'); // 'modal' | 'split'
   const [transferInfo, setTransferInfo] = useState(null);
 
   const loadDir = useCallback(async (path) => {
@@ -136,7 +143,13 @@ export default function FileManager({ sessionId, addToast }) {
     try {
       const data = await AppGo.ListDir(sessionId, path);
       // Wails 传回的数据： name, isDirectory, size, modifyTime, rights
-      setItems(data || []);
+      // 排序：文件夹在前、文件在后，各自按名称字母排序
+      const sorted = (data || []).sort((a, b) => {
+        if (a.isDirectory && !b.isDirectory) return -1;
+        if (!a.isDirectory && b.isDirectory) return 1;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+      setItems(sorted);
       setCurrentPath(path);
     } catch (err) {
       addToast(`读取目录失败: ${err}`, 'error');
@@ -228,9 +241,7 @@ export default function FileManager({ sessionId, addToast }) {
 
   // Download file via Wails native file dialog
   const handleDownload = async (item) => {
-    const remotePath = currentPath === '/'
-      ? `/${item.name}`
-      : `${currentPath}/${item.name}`;
+    const remotePath = buildRemotePath(currentPath, item.name);
     
     try {
       setTransferInfo({ name: item.name, progress: 0, direction: 'download' });
@@ -245,9 +256,7 @@ export default function FileManager({ sessionId, addToast }) {
 
   // Open file editor
   const handleEdit = async (item) => {
-    const remotePath = currentPath === '/'
-      ? `/${item.name}`
-      : `${currentPath}/${item.name}`;
+    const remotePath = buildRemotePath(currentPath, item.name);
     try {
       const content = await AppGo.ReadFile(sessionId, remotePath);
       setEditFile({ path: remotePath, name: item.name, content });
@@ -269,9 +278,7 @@ export default function FileManager({ sessionId, addToast }) {
 
   // Delete
   const handleDelete = async (item) => {
-    const remotePath = currentPath === '/'
-      ? `/${item.name}`
-      : `${currentPath}/${item.name}`;
+    const remotePath = buildRemotePath(currentPath, item.name);
     if (!(await window.aetherDialog?.confirm(`确定删除「${item.name}」？此操作不可撤销`))) return;
     try {
       await AppGo.DeleteItem(sessionId, remotePath, item.isDirectory);
@@ -286,7 +293,7 @@ export default function FileManager({ sessionId, addToast }) {
   const handleMkdir = async () => {
     const name = await window.aetherDialog?.prompt('新文件夹名称:');
     if (!name) return;
-    const remotePath = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
+    const remotePath = buildRemotePath(currentPath, name);
     try {
       await AppGo.Mkdir(sessionId, remotePath);
       addToast(`文件夹创建成功: ${name}`, 'success');
@@ -298,7 +305,7 @@ export default function FileManager({ sessionId, addToast }) {
 
   // Compress
   const handleCompress = async (item) => {
-    const remotePath = currentPath === '/' ? `/${item.name}` : `${currentPath}/${item.name}`;
+    const remotePath = buildRemotePath(currentPath, item.name);
     try {
       setLoading(true);
       addToast(`正在压缩 ${item.name}...`, 'info');
@@ -313,7 +320,7 @@ export default function FileManager({ sessionId, addToast }) {
 
   // Uncompress
   const handleUncompress = async (item) => {
-    const remotePath = currentPath === '/' ? `/${item.name}` : `${currentPath}/${item.name}`;
+    const remotePath = buildRemotePath(currentPath, item.name);
     try {
       setLoading(true);
       addToast(`正在解压 ${item.name}...`, 'info');
@@ -337,8 +344,8 @@ export default function FileManager({ sessionId, addToast }) {
       setRenamingItem(null);
       return;
     }
-    const oldPath = currentPath === '/' ? `/${renamingItem.name}` : `${currentPath}/${renamingItem.name}`;
-    const newPath = currentPath === '/' ? `/${renameValue}` : `${currentPath}/${renameValue}`;
+    const oldPath = buildRemotePath(currentPath, renamingItem.name);
+    const newPath = buildRemotePath(currentPath, renameValue);
     try {
       await AppGo.RenameItem(sessionId, oldPath, newPath);
       addToast('重命名成功', 'success');
@@ -347,6 +354,15 @@ export default function FileManager({ sessionId, addToast }) {
       addToast(`重命名失败: ${err}`, 'error');
     } finally {
       setRenamingItem(null);
+    }
+  };
+
+  const handleCopyPath = async (item) => {
+    try {
+      await navigator.clipboard.writeText(buildRemotePath(currentPath, item.name));
+      addToast(t('路径已复制到剪贴板'), 'success');
+    } catch (err) {
+      addToast(`复制路径失败: ${err}`, 'error');
     }
   };
 
@@ -388,8 +404,31 @@ export default function FileManager({ sessionId, addToast }) {
         >
           ↻
         </button>
+        <button
+          className="btn btn-ghost btn-sm"
+          style={{ fontSize: 11, marginLeft: 4 }}
+          title={editMode === 'modal' ? '切换为分屏编辑' : '切换为弹窗编辑'}
+          onClick={() => {
+            const next = editMode === 'modal' ? 'split' : 'modal';
+            setEditMode(next);
+            localStorage.setItem('editMode', next);
+          }}
+        >
+          {editMode === 'modal' ? '🪟 弹窗' : '📐 分屏'}
+        </button>
       </div>
 
+      {/* Content: file list or split editor */}
+      {editFile && editMode === 'split' ? (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <button
+            onClick={() => setEditFile(null)}
+            style={{ alignSelf: 'flex-start', margin: '8px 12px 4px', padding: '4px 12px', borderRadius: 6, border: '1px solid var(--border-light)', background: 'transparent', color: 'var(--text-4)', fontSize: 12, cursor: 'pointer' }}
+          >← 返回</button>
+          <FileEditor file={editFile} onSave={handleSaveFile} onClose={() => setEditFile(null)} mode="split" />
+        </div>
+      ) : (
+      <>
       {/* File List */}
       <div className="file-list">
         <div className="file-list-header">
@@ -511,6 +550,7 @@ export default function FileManager({ sessionId, addToast }) {
           item={contextMenu.item}
           t={t}
           onClose={closeContextMenu}
+          onCopyPath={() => { handleCopyPath(contextMenu.item); closeContextMenu(); }}
           onDownload={() => { handleDownload(contextMenu.item); closeContextMenu(); }}
           onEdit={() => { handleEdit(contextMenu.item); closeContextMenu(); }}
           onRename={() => { startRename(contextMenu.item); closeContextMenu(); }}
@@ -535,13 +575,15 @@ export default function FileManager({ sessionId, addToast }) {
           </div>
         </div>
       )}
+      </>)}
 
-      {/* File Editor Modal */}
-      {editFile && (
+      {/* File Editor Modal (only in modal mode) */}
+      {editFile && editMode === 'modal' && (
         <FileEditor
           file={editFile}
           onSave={handleSaveFile}
           onClose={() => setEditFile(null)}
+          mode={editMode}
         />
       )}
     </div>

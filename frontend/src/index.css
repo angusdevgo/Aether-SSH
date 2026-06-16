@@ -21,18 +21,18 @@
   /* Borders */
   --border: rgba(43, 54, 46, 0.8);
   --border-light: rgba(43, 54, 46, 0.4);
-  --border-focus: rgba(34, 197, 94, 0.6);
+  --border-focus: rgba(100, 116, 139, 0.6);
 
   /* Text */
-  --text-1: #f0fdf4;
-  --text-2: #dcfce7;
-  --text-3: #86efac;
-  --text-4: #4ade80;
+  --text-1: #f1f5f9;
+  --text-2: #cbd5e1;
+  --text-3: #94a3b8;
+  --text-4: #64748b;
 
   /* Accents */
-  --green: #22c55e;
-  --green-dim: rgba(34, 197, 94, 0.15);
-  --green-glow: rgba(34, 197, 94, 0.4);
+  --green: #64748b;
+  --green-dim: rgba(100, 116, 139, 0.15);
+  --green-glow: rgba(100, 116, 139, 0.4);
   --blue: #3b82f6;
   --blue-dim: rgba(59, 130, 246, 0.15);
   --red: #ef4444;
@@ -44,7 +44,7 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
-  --shadow-glow-green: 0 0 20px rgba(34, 197, 94, 0.2);
+  --shadow-glow-green: 0 0 20px rgba(100, 116, 139, 0.15);
 
   /* Transitions */
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -84,7 +84,7 @@ body.theme-light {
   /* Borders */
   --border: rgba(15, 23, 42, 0.08);
   --border-light: rgba(15, 23, 42, 0.04);
-  --border-focus: #22c55e;
+  --border-focus: #64748b;
 
   /* Text */
   --text-1: #0f172a;
@@ -96,7 +96,7 @@ body.theme-light {
   --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05);
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
   --shadow-lg: 0 12px 24px rgba(15, 23, 42, 0.12);
-  --shadow-glow-green: 0 0 20px rgba(34, 197, 94, 0.08);
+  --shadow-glow-green: 0 0 20px rgba(100, 116, 139, 0.08);
 }
 
 /* ── Reset ──────────────────────────────────────────────────── */
@@ -135,7 +135,7 @@ a { color: var(--blue); text-decoration: none; }
   z-index: 10;
   color: var(--text-2);
   border-radius: 14px;
-  border: 1px solid rgba(34, 197, 94, 0.35); /* 精致的青色细边框 */
+  border: 1px solid var(--border-focus); /* 精致细边框 */
 }
 
 .topbar {
@@ -333,11 +333,12 @@ a { color: var(--blue); text-decoration: none; }
 .btn-primary {
   background: var(--green);
   color: var(--bg-0);
-  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+  box-shadow: var(--green-glow);
 }
 .btn-primary:hover {
-  background: #16a34a;
-  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
+  background: var(--green);
+  filter: brightness(0.85);
+  box-shadow: var(--green-glow);
   transform: translateY(-1px);
 }
 
@@ -855,7 +856,7 @@ a { color: var(--blue); text-decoration: none; }
 .system-val {
   font-family: var(--font-mono);
   color: var(--green);
-  background: rgba(34, 197, 94, 0.08);
+  background: var(--green-dim);
   padding: 1px 4px;
   border-radius: 3px;
 }
@@ -1246,7 +1247,7 @@ a { color: var(--blue); text-decoration: none; }
   cursor: pointer;
   transition: var(--transition);
 }
-.context-menu-item:hover { background: rgba(34, 197, 94, 0.15); color: var(--green); }
+.context-menu-item:hover { background: var(--green-dim); color: var(--green); }
 .context-menu-item.danger { color: var(--red); }
 .context-menu-item.danger:hover { background: var(--red-dim); }
 .context-menu-divider { height: 1px; background: var(--border); margin: 4px 0; }
@@ -1789,7 +1790,7 @@ a { color: var(--blue); text-decoration: none; }
 }
 
 .context-menu-item:hover {
-  background-color: rgba(34, 197, 94, 0.15);
+  background-color: var(--green-dim);
   color: var(--green);
 }
 
@@ -1829,9 +1830,9 @@ a { color: var(--blue); text-decoration: none; }
 
 /* ── 连接成功一次性涟漪动画 ──────────────────────────────────── */
 @keyframes connect-ripple {
-  0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.75), 0 0 6px var(--green); }
-  60%  { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0), 0 0 12px var(--green); }
-  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0), 0 0 6px var(--green); }
+  0%   { box-shadow: 0 0 0 0 var(--green), 0 0 6px var(--green); }
+  60%  { box-shadow: 0 0 0 8px transparent, 0 0 12px var(--green); }
+  100% { box-shadow: 0 0 0 0 transparent, 0 0 6px var(--green); }
 }
 
 .status-dot.just-connected {

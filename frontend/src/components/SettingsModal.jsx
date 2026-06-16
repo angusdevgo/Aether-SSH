@@ -259,7 +259,7 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
 
   // Appearance state
   const [themeMode, setThemeMode] = useState(localStorage.getItem('themeMode') || 'dark');
-  const [themeAccent, setThemeAccent] = useState(localStorage.getItem('themeAccent') || '#10b981');
+  const [themeAccent, setThemeAccent] = useState(localStorage.getItem('themeAccent') || '#64748b');
   const [useCustomAccent, setUseCustomAccent] = useState(localStorage.getItem('useCustomAccent') === 'true');
   const [language, setLanguage] = useState(localStorage.getItem('appLanguage') || 'zh-CN');
   const [appFont, setAppFont] = useState(localStorage.getItem('appFont') || 'system-ui');
@@ -351,7 +351,7 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
     if (nextVal) {
       document.documentElement.style.setProperty('--green', themeAccent);
     } else {
-      document.documentElement.style.setProperty('--green', '#10b981');
+      document.documentElement.style.setProperty('--green', '#64748b');
     }
     addToast(nextVal ? '已启用自定义强调色' : '已恢复默认强调色', 'success');
   };
@@ -725,15 +725,15 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
                         onClick={() => { setPingProtocol(opt.id); localStorage.setItem('pingProtocol', opt.id); }}
                         style={{
                           display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px',
-                          background: pingProtocol === opt.id ? 'rgba(34,197,94,0.06)' : 'var(--bg-2)',
-                          border: `1px solid ${pingProtocol === opt.id ? 'rgba(34,197,94,0.4)' : 'var(--border)'}`,
+                          background: pingProtocol === opt.id ? 'var(--green-dim)' : 'var(--bg-2)',
+                          border: `1px solid ${pingProtocol === opt.id ? 'var(--green-glow)' : 'var(--border)'}`,
                           borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s',
                         }}
                       >
                         <div style={{
                           width: 18, height: 18, borderRadius: '50%', flexShrink: 0, marginTop: 1,
-                          border: `2px solid ${pingProtocol === opt.id ? '#22c55e' : 'var(--border)'}`,
-                          background: pingProtocol === opt.id ? '#22c55e' : 'transparent',
+                          border: `2px solid ${pingProtocol === opt.id ? 'var(--green)' : 'var(--border)'}`,
+                          background: pingProtocol === opt.id ? 'var(--green)' : 'transparent',
                           display: 'flex', alignItems: 'center', justifyContent: 'center'
                         }}>
                           {pingProtocol === opt.id && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
@@ -741,7 +741,7 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{opt.label}</span>
-                            {opt.tag && <span style={{ fontSize: 10, background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.4)', color: '#22c55e', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>{opt.tag}</span>}
+                            {opt.tag && <span style={{ fontSize: 10, background: 'var(--green-dim)', border: '1px solid var(--green-glow)', color: 'var(--green)', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>{opt.tag}</span>}
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-4)', marginTop: 3 }}>{opt.desc}</div>
                         </div>
@@ -767,9 +767,9 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
                             onClick={() => { setProbeInterval(s); localStorage.setItem('probeInterval', String(s)); }}
                             style={{
                               padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid',
-                              borderColor: probeInterval === s ? '#22c55e' : 'var(--border)',
-                              background: probeInterval === s ? 'rgba(34,197,94,0.1)' : 'var(--bg-3)',
-                              color: probeInterval === s ? '#22c55e' : 'var(--text-3)',
+                              borderColor: probeInterval === s ? 'var(--green)' : 'var(--border)',
+                              background: probeInterval === s ? 'var(--green-dim)' : 'var(--bg-3)',
+                              color: probeInterval === s ? 'var(--green)' : 'var(--text-3)',
                               transition: 'all 0.15s',
                             }}
                           >{s}s</button>
@@ -789,9 +789,9 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
                             }}
                             style={{
                               padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid',
-                              borderColor: pingInterval === s ? '#22c55e' : 'var(--border)',
-                              background: pingInterval === s ? 'rgba(34,197,94,0.1)' : 'var(--bg-3)',
-                              color: pingInterval === s ? '#22c55e' : 'var(--text-3)',
+                              borderColor: pingInterval === s ? 'var(--green)' : 'var(--border)',
+                              background: pingInterval === s ? 'var(--green-dim)' : 'var(--bg-3)',
+                              color: pingInterval === s ? 'var(--green)' : 'var(--text-3)',
                               transition: 'all 0.15s',
                             }}
                           >{s}s</button>
@@ -859,7 +859,7 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
                     <div style={{ color: 'var(--text-4)', fontSize: 11, marginBottom: 12 }}>选择终端的配色风格，即时生效</div>
                     <div className="theme-palette-grid">
                       {[
-                        { key: 'aether',      name: 'Aether Default', swatches: ['#22c55e', '#58a6ff', '#bc8cff', '#ff7b72'] },
+                        { key: 'aether',      name: 'Aether Default', swatches: ['var(--green)', '#58a6ff', '#bc8cff', '#ff7b72'] },
                         { key: 'tokyo-night', name: 'Tokyo Night',    swatches: ['#7aa2f7', '#bb9af7', '#73daca', '#f7768e'] },
                         { key: 'catppuccin',  name: 'Catppuccin',     swatches: ['#cba6f7', '#89b4fa', '#a6e3a1', '#f38ba8'] },
                         { key: 'dracula',     name: 'Dracula',        swatches: ['#ff79c6', '#bd93f9', '#50fa7b', '#ff5555'] },
@@ -1251,7 +1251,7 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
                   <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 20 }}>同步所有配置，全程 AES-256 高强加密</div>
                   
                   {isConfigured && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 8, marginBottom: 20, color: 'var(--green)', fontSize: 13 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--green-dim)', border: '1px solid var(--green-glow)', borderRadius: 8, marginBottom: 20, color: 'var(--green)', fontSize: 13 }}>
                       <span>✨</span> <span><strong>已开启自动云端备份：</strong>当您添加、编辑、删除服务器或修改配置时，后台将静默保存至云端。</span>
                     </div>
                   )}

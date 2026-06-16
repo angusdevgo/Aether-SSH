@@ -1,11 +1,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import './index.css';
 
 // Load initial theme and accent color
 const savedTheme = localStorage.getItem('themeMode') || 'dark';
-const savedAccent = localStorage.getItem('themeAccent') || '#10b981';
+const savedAccent = localStorage.getItem('themeAccent') || '#64748b';
 
 if (savedTheme === 'light') {
   document.body.classList.add('theme-light');
@@ -21,6 +22,8 @@ document.addEventListener('contextmenu', (e) => e.preventDefault());
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 );

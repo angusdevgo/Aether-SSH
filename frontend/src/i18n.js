@@ -41,6 +41,8 @@ const dict = {
     "您还没有手工输入任何命令": "您还没有手工输入任何命令",
     "在此连接的终端中手工输入并回车执行的指令将自动留存，方便您在此浏览与重复运行。": "在此连接的终端中手工输入并回车执行的指令将自动留存，方便您在此浏览与重复运行。",
     "复制": "复制",
+    "复制路径": "复制路径",
+    "路径已复制到剪贴板": "路径已复制到剪贴板",
     "再次运行": "再次运行",
 
     "名称": "名称",
@@ -113,6 +115,8 @@ const dict = {
     "您还没有手工输入任何命令": "No commands entered manually yet",
     "在此连接的终端中手工输入并回车执行的指令将自动留存，方便您在此浏览与重复运行。": "Commands manually executed in this terminal will be saved automatically, allowing you to browse and run them again.",
     "复制": "Copy",
+    "复制路径": "Copy Path",
+    "路径已复制到剪贴板": "Path copied to clipboard",
     "再次运行": "Run Again",
 
     "名称": "Name",

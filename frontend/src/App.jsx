@@ -9,6 +9,9 @@ import FileManager from './components/FileManager.jsx';
 import SettingsModal from './components/SettingsModal.jsx';
 import Toast from './components/Toast.jsx';
 import CommandHistory from './components/CommandHistory.jsx';
+import QuickCommands from './components/QuickCommands.jsx';
+import PortForward from './components/PortForward.jsx';
+import { useSessions } from './useSessions.js';
 import GlobalDialog from './components/GlobalDialog.jsx';
 import GlobalContextMenu from './components/GlobalContextMenu.jsx';
 import { clampPanelWidth } from './components/probeFormatting.js';
@@ -22,16 +25,18 @@ export default function App() {
   const { t } = useTranslation();
   const [servers, setServers] = useState([]);
   const [pings, setPings] = useState({});
-  const [sessions, setSessions] = useState([]);      // { id, serverId, serverName, host, status, osInfo }
-  const [activeSessionId, setActiveSessionId] = useState(null);
-  const [contentTab, setContentTab] = useState('terminal'); // 'terminal' | 'files'
+
+  const [contentTab, setContentTab] = useState('terminal');
   const [showAddServer, setShowAddServer] = useState(false);
   const [editServer, setEditServer] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showKeys, setShowKeys] = useState(false);
   const [showTrayPanel, setShowTrayPanel] = useState(false);
   const [showProbe, setShowProbe] = useState(false); // 探针面板 toggle
-  const [connectingServer, setConnectingServer] = useState(null); // { server, sessionId, startTime }
+  const [tabMenu, setTabMenu] = useState(null); // { sessionId, x, y }
+  const [renamingTab, setRenamingTab] = useState(null); // sessionId being renamed
+  const [renameValue, setRenameValue] = useState('');
+  const [showQuickCommands, setShowQuickCommands] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [monitoringEnabled, setMonitoringEnabled] = useState({}); // { [sessionId]: boolean }
@@ -396,6 +401,41 @@ export default function App() {
     }
   }, [addToast]);
 
+  // ── 会话管理 (useSessions hook 替代 inline 130 行) ──────
+  const handleConnected = (sessionId, info) => {
+    setMonitoringEnabled(prev => ({ ...prev, [sessionId]: true }));
+    const detectedOs = info.os || info.platform || '';
+    if (detectedOs) {
+      setServers(prevServers => {
+        const sid = sessions.find(s => s.id === sessionId)?.serverId;
+        const currentServer = prevServers.find(s => s.id === sid);
+        if (currentServer && currentServer.os !== detectedOs) {
+          const updated = { ...currentServer, os: detectedOs };
+          AppGo.SaveConnection(updated).catch(console.error);
+          return prevServers.map(s => s.id === updated.id ? updated : s);
+        }
+        return prevServers;
+      });
+    }
+  };
+  const {
+    sessions, setSessions, activeSessionId, setActiveSessionId,
+    connectingServer, setConnectingServer,
+    connectServer, reconnectSession, closeSession,
+  } = useSessions(addToast, handleConnected);
+
+  // 包装 connectServer 以处理 contentTab 和 recentServers
+  const connectServerWrapped = useCallback(async (server) => {
+    setContentTab('terminal');
+    connectServer(server);
+    setRecentServers(prev => {
+      const filtered = prev.filter(s => s.id !== server.id);
+      const updated = [server, ...filtered].slice(0, 4);
+      localStorage.setItem('recent_servers', JSON.stringify(updated));
+      return updated;
+    });
+  }, [connectServer]);
+
   useEffect(() => { loadServers(); }, [loadServers]);
 
   // ── Ping all servers ───────────────────────────────────────
@@ -435,55 +475,6 @@ export default function App() {
     }
   }, []);
 
-  // ── 重连会话核心逻辑 ────────────────────────────────────────
-  const reconnectSession = useCallback(async (session) => {
-    setSessions((prev) =>
-      prev.map((s) => (s.id === session.id ? { ...s, status: 'connecting' } : s))
-    );
-
-    // 如果是当前激活的会话，展示连接等待卡片
-    const serverObj = servers.find((sv) => sv.id === session.serverId);
-    if (serverObj) {
-      setConnectingServer({ server: serverObj, sessionId: session.id, startTime: Date.now() });
-    }
-
-    try {
-      await AppGo.ConnectSSH(session.id, session.serverId);
-      setSessions((prev) =>
-        prev.map((s) => (s.id === session.id ? { ...s, status: 'connected' } : s))
-      );
-      setConnectingServer(null);
-      addToast('重新连接成功', 'success');
-
-      // 后台重新部署并激活探针状态
-      try {
-        const info = await AppGo.SystemInfo(session.id);
-        if (info) {
-          setSessions((prev) => prev.map((s) => s.id === session.id ? { ...s, osInfo: info } : s));
-          setMonitoringEnabled((prev) => ({ ...prev, [session.id]: true }));
-          const detectedOs = info.os || info.platform || '';
-          if (detectedOs) {
-            setServers(prevServers => {
-              const currentServer = prevServers.find(s => s.id === session.serverId);
-              if (currentServer && currentServer.os !== detectedOs) {
-                const updatedServer = { ...currentServer, os: detectedOs };
-                AppGo.SaveConnection(updatedServer).catch(console.error);
-                return prevServers.map(s => s.id === updatedServer.id ? updatedServer : s);
-              }
-              return prevServers;
-            });
-          }
-        }
-      } catch (_) {}
-    } catch (err) {
-      setSessions((prev) =>
-        prev.map((s) => (s.id === session.id ? { ...s, status: 'error' } : s))
-      );
-      setConnectingServer(null);
-      addToast(`重新连接失败: ${err}`, 'error', 5000);
-    }
-  }, [servers, addToast]);
-
   // ── 监听 SSH 意外断开事件 ────────────────────────────────────
   useEffect(() => {
     const unbind = EventsOn('ssh-disconnected', (sessionId) => {
@@ -491,6 +482,16 @@ export default function App() {
         prev.map((s) => (s.id === sessionId ? { ...s, status: 'closed' } : s))
       );
       addToast('SSH 连接已意外断开', 'error', 4000);
+    });
+    return () => {
+      if (unbind) unbind();
+    };
+  }, [addToast]);
+
+  // ── 监听 SSH 主机密钥变更事件 ─────────────────────────────────
+  useEffect(() => {
+    const unbind = EventsOn('ssh-hostkey-changed', (hostname) => {
+      addToast(`主机密钥已变更: ${hostname}，已自动信任新密钥`, 'warning', 5000);
     });
     return () => {
       if (unbind) unbind();
@@ -507,90 +508,16 @@ export default function App() {
       }
     };
     window.addEventListener('ssh-reconnect-trigger', handleReconnectTrigger);
-    return () => window.removeEventListener('ssh-reconnect-trigger', handleReconnectTrigger);
-  }, [sessions, reconnectSession]);
-
-  // ── Connect to server ──────────────────────────────────────
-  const connectServer = useCallback(async (server) => {
-    const existing = sessions.find((s) => s.serverId === server.id && s.status !== 'closed');
-    if (existing) {
-      setActiveSessionId(existing.id);
-      setContentTab('terminal');
-      return;
-    }
-
-    const sessionId = `session_${Date.now()}`;
-    const newSession = {
-      id: sessionId,
-      serverId: server.id,
-      serverName: server.name || server.host,
-      host: server.host,
-      status: 'connecting',
+    const handleQuickCommand = (e) => {
+      const { sessionId: sid, command } = e.detail || {};
+      if (sid) AppGo.WriteTerminal(sid, command);
     };
-
-    setSessions((prev) => [...prev, newSession]);
-    setActiveSessionId(sessionId);
-    setContentTab('terminal');
-    // 显示连接进度卡片
-    setConnectingServer({ server, sessionId, startTime: Date.now() });
-
-    try {
-      await AppGo.ConnectSSH(sessionId, server.id);
-      setSessions((prev) =>
-        prev.map((s) => (s.id === sessionId ? { ...s, status: 'connected' } : s))
-      );
-      setConnectingServer(null); // 连接成功，关闭进度卡片
-
-      // 连接成功后自动查询 OS 信息并更新 sessions
-      try {
-        const info = await AppGo.SystemInfo(sessionId);
-        if (info) {
-          setSessions((prev) => prev.map((s) => s.id === sessionId ? { ...s, osInfo: info } : s));
-          // 检测到探针执行成功，自动启用监控面板
-          setMonitoringEnabled((prev) => ({ ...prev, [sessionId]: true }));
-          const detectedOs = info.os || info.platform || '';
-          if (detectedOs) {
-            setServers(prevServers => {
-              const currentServer = prevServers.find(s => s.id === server.id);
-              if (currentServer && currentServer.os !== detectedOs) {
-                const updatedServer = { ...currentServer, os: detectedOs };
-                AppGo.SaveConnection(updatedServer).catch(console.error);
-                return prevServers.map(s => s.id === updatedServer.id ? updatedServer : s);
-              }
-              return prevServers;
-            });
-          }
-        }
-      } catch (_) {}
-
-      // 连接成功后加入最近连接列表
-      setRecentServers((prev) => {
-        const filtered = prev.filter((s) => s.id !== server.id);
-        const updated = [server, ...filtered].slice(0, 4);
-        localStorage.setItem('recent_servers', JSON.stringify(updated));
-        return updated;
-      });
-    } catch (err) {
-      setSessions((prev) =>
-        prev.map((s) => (s.id === sessionId ? { ...s, status: 'error' } : s))
-      );
-      setConnectingServer(null); // 连接失败，关闭进度卡片
-      addToast(`连接失败: ${err}`, 'error', 5000);
-    }
-  }, [sessions, addToast]);
-
-  // ── Close session ──────────────────────────────────────────
-  const closeSession = useCallback(async (sessionId, e) => {
-    e?.stopPropagation();
-    try {
-      await AppGo.DisconnectSSH(sessionId);
-    } catch (e) {}
-    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-    if (activeSessionId === sessionId) {
-      const remaining = sessions.filter((s) => s.id !== sessionId);
-      setActiveSessionId(remaining.length > 0 ? remaining[remaining.length - 1].id : null);
-    }
-  }, [activeSessionId, sessions]);
+    window.addEventListener('ssh-quick-command', handleQuickCommand);
+    return () => {
+      window.removeEventListener('ssh-reconnect-trigger', handleReconnectTrigger);
+      window.removeEventListener('ssh-quick-command', handleQuickCommand);
+    };
+  }, [sessions, reconnectSession]);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId);
 
@@ -605,7 +532,7 @@ export default function App() {
     );
 
     if (existing) {
-      connectServer(existing);
+      connectServerWrapped(existing);
       setSearchQuery('');
       return;
     }
@@ -697,6 +624,10 @@ export default function App() {
                   key={s.id}
                   className={`tab-item no-drag ${activeSessionId === s.id ? 'active' : ''}`}
                   onClick={() => setActiveSessionId(s.id)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setTabMenu({ sessionId: s.id, x: e.clientX, y: e.clientY });
+                  }}
                   style={{ height: '28px', minHeight: '28px', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
                   <span style={{ fontSize: '10px', display: 'inline-block', lineHeight: 1 }}>
@@ -705,8 +636,34 @@ export default function App() {
                      s.status === 'error'      ? '🔴' :
                      s.status === 'closed'     ? '🔴' : '⚫'}
                   </span>
-                  <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {s.serverName}
+                  <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      setRenamingTab(s.id);
+                      setRenameValue(s.serverName);
+                    }}
+                  >
+                    {renamingTab === s.id ? (
+                      <input
+                        autoFocus
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onBlur={() => {
+                          if (renameValue.trim()) {
+                            setSessions(prev => prev.map(ss => ss.id === s.id ? { ...ss, serverName: renameValue.trim() } : ss));
+                          }
+                          setRenamingTab(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') e.target.blur();
+                          if (e.key === 'Escape') { setRenamingTab(null); }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ width: 100, background: 'var(--bg-2)', border: '1px solid var(--border-focus)', borderRadius: 3, color: 'var(--text-1)', fontSize: 12, padding: '1px 4px', outline: 'none' }}
+                      />
+                    ) : (
+                      s.serverName
+                    )}
                   </span>
                   {(s.status === 'closed' || s.status === 'error') && (
                     <span
@@ -890,7 +847,7 @@ export default function App() {
                     sessions={sessions}
                     activeSessionId={activeSessionId}
                     viewMode={serverListViewMode}
-                    onConnect={connectServer}
+                    onConnect={connectServerWrapped}
                     onEdit={(s) => { setEditServer(s); setShowAddServer(true); }}
                     onDelete={handleDeleteServer}
                   />
@@ -926,6 +883,20 @@ export default function App() {
                     disabled={activeSession.status !== 'connected'}
                   >
                     📜 {t('历史指令')}
+                  </button>
+                  <button
+                    className={`content-tab ${contentTab === 'quick' ? 'active' : ''}`}
+                    onClick={() => setContentTab('quick')}
+                    disabled={activeSession.status !== 'connected'}
+                  >
+                    ⚡ 快捷命令
+                  </button>
+                  <button
+                    className={`content-tab ${contentTab === 'forward' ? 'active' : ''}`}
+                    onClick={() => setContentTab('forward')}
+                    disabled={activeSession.status !== 'connected'}
+                  >
+                    🔌 端口转发
                   </button>
                 </div>
                 
@@ -1022,6 +993,23 @@ export default function App() {
                       {s.status === 'connected' && (
                         <div style={{ display: contentTab === 'history' ? 'block' : 'none', height: '100%', flex: 1 }}>
                           <CommandHistory
+                            sessionId={s.id}
+                            serverKey={s.serverId}
+                            addToast={addToast}
+                          />
+                        </div>
+                      )}
+                      {s.status === 'connected' && (
+                        <div style={{ display: contentTab === 'quick' ? 'block' : 'none', height: '100%', flex: 1 }}>
+                          <QuickCommands
+                            sessionId={s.id}
+                            addToast={addToast}
+                          />
+                        </div>
+                      )}
+                      {s.status === 'connected' && (
+                        <div style={{ display: contentTab === 'forward' ? 'block' : 'none', height: '100%', flex: 1 }}>
+                          <PortForward
                             sessionId={s.id}
                             addToast={addToast}
                           />
@@ -1131,10 +1119,10 @@ export default function App() {
                     display: 'flex', alignItems: 'center', gap: 12,
                     padding: '12px 14px', borderRadius: 10,
                     background: i === 0 ? 'rgba(16,185,129,0.1)' : 'var(--bg-2)',
-                    border: i === 0 ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border)',
+                    border: i === 0 ? '1px solid var(--green-glow)' : '1px solid var(--border)',
                     cursor: 'pointer',
                   }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Key size={18} style={{ color: '#10b981' }} /></div>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--green-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Key size={18} style={{ color: 'var(--green)' }} /></div>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', fontFamily: 'var(--font-mono)' }}>{key.path}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>Type {key.type}</div>
@@ -1225,22 +1213,22 @@ export default function App() {
             {/* 双进度条（参考图一）*/}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
               {/* 左进度点 */}
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', flexShrink: 0, boxShadow: '0 0 8px #22c55e' }} />
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--green)', flexShrink: 0, boxShadow: '0 0 8px var(--green)' }} />
               {/* 进度条 */}
               <div style={{ flex: 1, height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
                 <div style={{
                   height: '100%', borderRadius: 4,
-                  background: 'linear-gradient(90deg, #22c55e, #86efac)',
+                  background: 'linear-gradient(90deg, var(--green), #86efac)',
                   animation: 'ssh-progress-indeterminate 1.4s ease-in-out infinite',
                 }} />
               </div>
               {/* WiFi 图标 */}
-              <div style={{ flexShrink: 0, fontSize: 14, color: '#22c55e' }}>📡</div>
+              <div style={{ flexShrink: 0, fontSize: 14, color: 'var(--green)' }}>📡</div>
               {/* 第二段进度条 */}
               <div style={{ flex: 1, height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
                 <div style={{
                   height: '100%', borderRadius: 4,
-                  background: 'linear-gradient(90deg, #22c55e, #86efac)',
+                  background: 'linear-gradient(90deg, var(--green), #86efac)',
                   animation: 'ssh-progress-indeterminate 1.4s ease-in-out 0.4s infinite',
                 }} />
               </div>
@@ -1315,7 +1303,7 @@ export default function App() {
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 6px var(--green)' }} />
                       <span style={{ fontSize: 14, color: '#f0f6fc', fontWeight: 500 }}>{s.serverName}</span>
                     </div>
                     <span style={{ fontSize: 12, color: '#6e7681' }}>已连接</span>
@@ -1403,22 +1391,22 @@ export default function App() {
             {/* 双进度条（参考图一）*/}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
               {/* 左进度点 */}
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', flexShrink: 0, boxShadow: '0 0 8px #22c55e' }} />
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--green)', flexShrink: 0, boxShadow: '0 0 8px var(--green)' }} />
               {/* 进度条 */}
               <div style={{ flex: 1, height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
                 <div style={{
                   height: '100%', borderRadius: 4,
-                  background: 'linear-gradient(90deg, #22c55e, #86efac)',
+                  background: 'linear-gradient(90deg, var(--green), #86efac)',
                   animation: 'ssh-progress-indeterminate 1.4s ease-in-out infinite',
                 }} />
               </div>
               {/* WiFi 图标 */}
-              <div style={{ flexShrink: 0, fontSize: 14, color: '#22c55e' }}>📡</div>
+              <div style={{ flexShrink: 0, fontSize: 14, color: 'var(--green)' }}>📡</div>
               {/* 第二段进度条 */}
               <div style={{ flex: 1, height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
                 <div style={{
                   height: '100%', borderRadius: 4,
-                  background: 'linear-gradient(90deg, #22c55e, #86efac)',
+                  background: 'linear-gradient(90deg, var(--green), #86efac)',
                   animation: 'ssh-progress-indeterminate 1.4s ease-in-out 0.4s infinite',
                 }} />
               </div>
@@ -1493,7 +1481,7 @@ export default function App() {
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 6px var(--green)' }} />
                       <span style={{ fontSize: 14, color: '#f0f6fc', fontWeight: 500 }}>{s.serverName}</span>
                     </div>
                     <span style={{ fontSize: 12, color: '#6e7681' }}>已连接</span>
@@ -1560,10 +1548,16 @@ export default function App() {
                   {t('稍等')}
                 </button>
                 <button 
-                  style={{ padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: '#10b981', border: 'none', color: '#fff', cursor: 'pointer', position: 'relative', overflow: 'hidden', transition: 'all 0.2s' }}
+                  style={{ padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer' }}
+                  onClick={() => window.runtime?.BrowserOpenURL('https://github.com/angusdevgo/Aether-SSH/releases/latest')}
+                >
+                  🌐 手动下载
+                </button>
+                <button 
+                  style={{ padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: 'var(--green-dim)', border: 'none', color: '#fff', cursor: 'pointer', position: 'relative', overflow: 'hidden', transition: 'all 0.2s' }}
                   onClick={handleApplyStartupUpdate}
                   onMouseEnter={e => e.currentTarget.style.background = '#059669'}
-                  onMouseLeave={e => e.currentTarget.style.background = '#10b981'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'var(--green)'}
                   disabled={downloadProgress >= 0}
                 >
                   {downloadProgress >= 0 && (
@@ -1585,6 +1579,28 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* Tab context menu */}
+      {tabMenu && (() => {
+        const sess = sessions.find(s => s.id === tabMenu.sessionId);
+        const server = sess ? servers.find(sv => sv.id === sess.serverId) : null;
+        return (
+          <div style={{ position: 'fixed', left: tabMenu.x, top: tabMenu.y, zIndex: 9999 }} onClick={() => setTabMenu(null)}>
+            <div style={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 8, padding: '4px 0', minWidth: 140, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+              {server && sess?.status === 'connected' && (
+                <div className="context-menu-item" onClick={() => { connectServerWrapped(server); setTabMenu(null); }}>
+                  🔄 克隆会话
+                </div>
+              )}
+              <div className="context-menu-item danger" onClick={() => {
+                if (sess) closeSession(sess.id);
+                setTabMenu(null);
+              }}>
+                ✕ 关闭会话
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       <GlobalContextMenu />
     </div>
   );
