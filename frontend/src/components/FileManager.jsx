@@ -135,19 +135,30 @@ export default function FileManager({ sessionId, addToast }) {
   const [renamingItem, setRenamingItem] = useState(null);
   const [renameValue, setRenameValue] = useState('');
   const [editFile, setEditFile] = useState(null);      // { path, name, content }
-  const [editMode, setEditMode] = useState(localStorage.getItem('editMode') || 'modal'); // 'modal' | 'split'
+  const [editMode, setEditMode] = useState(localStorage.getItem('editMode') || 'modal');
   const [transferInfo, setTransferInfo] = useState(null);
+  const [sortBy, setSortBy] = useState(localStorage.getItem('fmSortBy') || 'name');
+  const [sortDir, setSortDir] = useState(localStorage.getItem('fmSortDir') || 'asc');
 
   const loadDir = useCallback(async (path) => {
     setLoading(true);
     try {
       const data = await AppGo.ListDir(sessionId, path);
       // Wails 传回的数据： name, isDirectory, size, modifyTime, rights
-      // 排序：文件夹在前、文件在后，各自按名称字母排序
       const sorted = (data || []).sort((a, b) => {
+        // 文件夹始终在文件前面
         if (a.isDirectory && !b.isDirectory) return -1;
         if (!a.isDirectory && b.isDirectory) return 1;
-        return (a.name || '').localeCompare(b.name || '');
+        // 同类型内按 sortBy 排序
+        let cmp = 0;
+        if (sortBy === 'name') {
+          cmp = (a.name || '').localeCompare(b.name || '');
+        } else if (sortBy === 'size') {
+          cmp = (a.size || 0) - (b.size || 0);
+        } else if (sortBy === 'time') {
+          cmp = (a.modifyTime || '').localeCompare(b.modifyTime || '');
+        }
+        return sortDir === 'desc' ? -cmp : cmp;
       });
       setItems(sorted);
       setCurrentPath(path);
@@ -156,7 +167,7 @@ export default function FileManager({ sessionId, addToast }) {
     } finally {
       setLoading(false);
     }
-  }, [sessionId, addToast]);
+  }, [sessionId, addToast, sortBy, sortDir]);
 
   // ── 初始化自动同步最新终端目录 ───────────────────────────
   useEffect(() => {
@@ -209,12 +220,12 @@ export default function FileManager({ sessionId, addToast }) {
 
   // Breadcrumb parts
   const pathParts = currentPath === '/'
-    ? [{ label: '/', path: '/' }]
+    ? [{ label: '🏠', path: '/' }]
     : currentPath.split('/').filter(Boolean).reduce((acc, part, i, arr) => {
         const path = '/' + arr.slice(0, i + 1).join('/');
         acc.push({ label: part, path });
         return acc;
-      }, [{ label: '/', path: '/' }]);
+      }, [{ label: '🏠', path: '/' }]);
 
   // Navigate into folder
   const navigate = (item) => {
@@ -224,6 +235,14 @@ export default function FileManager({ sessionId, addToast }) {
       : `${currentPath}/${item.name}`;
     loadDir(newPath);
   };
+
+  const handleSort = (col) => {
+    const next = sortBy === col ? (sortDir === 'asc' ? 'desc' : 'asc') : 'asc';
+    setSortBy(col); setSortDir(next);
+    localStorage.setItem('fmSortBy', col); localStorage.setItem('fmSortDir', next);
+  };
+
+  const sortArrow = (col) => sortBy === col ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
 
   // Upload file via Wails native file dialog
   const handleUpload = async () => {
@@ -432,9 +451,9 @@ export default function FileManager({ sessionId, addToast }) {
       {/* File List */}
       <div className="file-list">
         <div className="file-list-header">
-          <span>{t('名称')}</span>
-          <span>{t('大小')}</span>
-          <span>{t('修改时间')}</span>
+          <span onClick={() => handleSort('name')} style={{ cursor: 'pointer' }}>{t('名称')}{sortArrow('name')}</span>
+          <span onClick={() => handleSort('size')} style={{ cursor: 'pointer' }}>{t('大小')}{sortArrow('size')}</span>
+          <span onClick={() => handleSort('time')} style={{ cursor: 'pointer' }}>{t('修改时间')}{sortArrow('time')}</span>
           <span></span>
         </div>
 

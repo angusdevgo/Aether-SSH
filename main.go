@@ -22,13 +22,6 @@ var assets embed.FS
 var icon []byte
 
 // forceShowWindow 多重策略唤醒窗口，解决长时间挂托盘后 WindowShow 失效的问题
-// forceShowWindow 唤醒隐藏到托盘的窗口，带 recover 防止 panic 导致托盘 goroutine 挂死
-func forceShowWindow(ctx context.Context) {
-	defer func() { recover() }()
-	runtime.WindowHide(ctx)
-	runtime.WindowShow(ctx)
-}
-
 func main() {
 	// 创建全局互斥锁，确保程序只能运行一个实例 (单例模式)
 	kernel32 := syscall.NewLazyDLL("kernel32.dll")
@@ -52,17 +45,21 @@ func main() {
 		mShow := systray.AddMenuItem("显示主窗口", "Show Main Window")
 		mQuit := systray.AddMenuItem("完全退出", "Quit Aether")
 
-		// Handle left click on the tray icon to show window
+		// 异步唤醒，防止 WebView2 挂起时阻塞托盘消息泵
 		systray.SetOnClick(func(menu systray.IMenu) {
-			if app.ctx != nil {
-				forceShowWindow(app.ctx)
-			}
+			go func() {
+				if app.ctx != nil {
+					runtime.WindowShow(app.ctx)
+				}
+			}()
 		})
 
 		mShow.Click(func() {
-			if app.ctx != nil {
-				forceShowWindow(app.ctx)
-			}
+			go func() {
+				if app.ctx != nil {
+					runtime.WindowShow(app.ctx)
+				}
+			}()
 		})
 
 		mQuit.Click(func() {
