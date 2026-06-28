@@ -17,9 +17,9 @@ if "%VERSION%"=="" (
 )
 
 echo [1/3] Configuring Go and NSIS environment...
-for %%I in ("%~dp0..\..\..") do set "ROOT_DIR=%%~fI"
-set "GO_BIN=%ROOT_DIR%\Source_Codes\Aether-Source\go\bin"
-set "NSIS_DIR=%ROOT_DIR%\Packaging_Tools\nsis\nsis-3.08"
+for %%I in ("%~dp0..\..") do set "ROOT_DIR=%%~fI"
+set "GO_BIN=%ROOT_DIR%\GO\go\bin"
+set "NSIS_DIR=%ROOT_DIR%\GO\Packaging_Tools\nsis\nsis-3.08"
 set "PATH=%GO_BIN%;%NSIS_DIR%;%USERPROFILE%\go\bin;%PATH%"
 
 echo [2/3] Building setup installer using Wails...
@@ -40,8 +40,8 @@ if "%EXE_PATH%"=="" (
 )
 
 echo [3/3] Archiving setup installer...
-set "OUTPUT_DIR=%ROOT_DIR%\exe"
-set "PORTABLE_DIR=%ROOT_DIR%\Portable"
+set "OUTPUT_DIR=%ROOT_DIR%\GO\exe"
+set "PORTABLE_DIR=%ROOT_DIR%\GO\Portable"
 if not exist "%OUTPUT_DIR%" (
     mkdir "%OUTPUT_DIR%"
 )
