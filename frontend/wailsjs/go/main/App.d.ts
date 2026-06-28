@@ -16,6 +16,8 @@ export function DisconnectSSH(arg1:string):Promise<void>;
 
 export function DownloadFile(arg1:string,arg2:string):Promise<void>;
 
+export function EditWithLocalEditor(arg1:string,arg2:string):Promise<string>;
+
 export function GetConnections():Promise<Array<main.Connection>>;
 
 export function GetTerminalCwd(arg1:string):Promise<string>;
@@ -64,7 +66,11 @@ export function UpdateApp(arg1:string,arg2:string):Promise<void>;
 
 export function UploadFile(arg1:string,arg2:string):Promise<void>;
 
+export function UploadFileFromPath(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function WriteFile(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function WriteFileBytes(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function WriteTerminal(arg1:string,arg2:string):Promise<void>;
 

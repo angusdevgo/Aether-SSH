@@ -226,6 +226,7 @@ export default function App() {
               version: 'v' + latest,
               url: downloadAssetUrl || data.html_url,
               filename: downloadFilename || 'update.exe',
+              body: data.body || '',
             });
             setIsUpdateModalVisible(true);
           }
@@ -260,10 +261,9 @@ export default function App() {
     setDownloadProgress(0);
     try {
       await AppGo.UpdateApp(startupUpdateInfo.url, startupUpdateInfo.filename);
-      // 后端成功后会自动重启应用
     } catch (err) {
-      addToast(`自动更新失败: ${err}`, 'error', 5000);
       setDownloadProgress(-1);
+      addToast(`自动更新失败 — 请使用「手动下载」`, 'error', 4000);
     }
   };
 
@@ -1518,66 +1518,75 @@ export default function App() {
         </div>
       )}
 
-      {/* 🚀 右下角小巧自动更新弹窗 */}
+      {/* 🚀 右下角自动更新弹窗 */}
       {isUpdateModalVisible && startupUpdateInfo && (
         <div style={{
           position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
-          width: 340, background: 'rgba(22, 27, 34, 0.95)', backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255,255,255,0.15)',
-          boxShadow: '0 16px 40px rgba(0,0,0,0.4)',
-          borderRadius: 16, padding: '16px 20px',
+          width: 380, background: 'rgba(22, 27, 34, 0.95)', backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
+          borderRadius: 16, padding: '20px 24px',
           animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 12 }}>
             <div style={{ fontSize: 28, lineHeight: 1, filter: 'drop-shadow(0 4px 8px rgba(16,185,129,0.3))' }}>🚀</div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: '#f0f6fc', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-                {t('发现新版本')} <span style={{ color: '#34d399', fontSize: 13, background: 'rgba(52, 211, 153, 0.1)', padding: '2px 6px', borderRadius: 6 }}>{startupUpdateInfo.version}</span>
+              <div style={{ fontSize: 15, fontWeight: 600, color: '#f0f6fc', marginBottom: 4 }}>
+                {t('发现新版本')}{' '}
+                <span style={{ color: '#34d399', fontSize: 13, background: 'rgba(52,211,153,0.1)', padding: '2px 8px', borderRadius: 6 }}>{startupUpdateInfo.version}</span>
               </div>
-              <div style={{ fontSize: 13, color: '#8b949e', lineHeight: 1.5, marginBottom: 16 }}>
+              <div style={{ fontSize: 13, color: '#8b949e', lineHeight: 1.6 }}>
                 {t('为了给您提供更极致的体验，建议您立即升级。')}
               </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button 
-                  style={{ padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#8b949e', cursor: 'pointer', transition: 'all 0.2s' }}
-                  onClick={() => setIsUpdateModalVisible(false)}
-                  onMouseEnter={e => { e.currentTarget.style.color = '#f0f6fc'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = '#8b949e'; e.currentTarget.style.background = 'transparent'; }}
-                  disabled={downloadProgress >= 0}
-                >
-                  {t('稍等')}
-                </button>
-                <button 
-                  style={{ padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer' }}
-                  onClick={() => window.runtime?.BrowserOpenURL('https://github.com/angusdevgo/Aether-SSH/releases/latest')}
-                >
-                  🌐 手动下载
-                </button>
-                <button 
-                  style={{ padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: 'var(--green-dim)', border: 'none', color: '#fff', cursor: 'pointer', position: 'relative', overflow: 'hidden', transition: 'all 0.2s' }}
-                  onClick={handleApplyStartupUpdate}
-                  onMouseEnter={e => e.currentTarget.style.background = '#059669'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'var(--green)'}
-                  disabled={downloadProgress >= 0}
-                >
+            </div>
+          </div>
+
+          {/* 更新内容 */}
+          {startupUpdateInfo.body && (
+            <div style={{
+              marginBottom: 14, padding: '10px 12px',
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 8, fontSize: 12, color: '#8b949e', lineHeight: 1.5,
+              maxHeight: 140, overflow: 'auto'
+            }}>
+              {(startupUpdateInfo.body || '').split('\n').filter(l => l.trim()).slice(0, 8).join('\n')}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button 
+              style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 12.5, fontWeight: 500, background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#8b949e', cursor: 'pointer' }}
+              onClick={() => setIsUpdateModalVisible(false)}
+              onMouseEnter={e => { e.currentTarget.style.color = '#f0f6fc'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#8b949e'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
+              disabled={downloadProgress >= 0}
+            >
+              {t('稍等')}
+            </button>
+            <button 
+              style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 12.5, fontWeight: 500, background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer' }}
+              onClick={() => window.runtime?.BrowserOpenURL('https://github.com/angusdevgo/Aether-SSH/releases/latest')}
+            >
+              🌐 手动下载
+            </button>
+            <button 
+              style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 12.5, fontWeight: 600, background: 'var(--green)', border: 'none', color: '#fff', cursor: 'pointer', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              onClick={handleApplyStartupUpdate}
+              disabled={downloadProgress >= 0}
+            >
                   {downloadProgress >= 0 && (
                     <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${downloadProgress}%`, background: 'rgba(0,0,0,0.2)', transition: 'width 0.2s ease-out' }} />
                   )}
-                  <span style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ position: 'relative', zIndex: 1 }}>
                     {downloadProgress >= 0 ? (
-                      <>
-                        <svg className="spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
-                        {downloadProgress}%
-                      </>
+                      '⏳ 正在更新...'
                     ) : (
                       t('立即更新')
                     )}
                   </span>
                 </button>
               </div>
-            </div>
           </div>
-        </div>
       )}
       {/* Tab context menu */}
       {tabMenu && (() => {

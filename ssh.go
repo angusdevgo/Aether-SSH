@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -194,7 +195,6 @@ func (m *SSHManager) Connect(sessionId string, conn Connection) error {
 	}
 
 	modes := ssh.TerminalModes{
-		ssh.ECHO:          1,
 		ssh.TTY_OP_ISPEED: 115200,
 		ssh.TTY_OP_OSPEED: 115200,
 	}
@@ -1014,6 +1014,7 @@ func (m *SSHManager) ReadFile(sessionId string, path string) (string, error) {
 	defer f.Close()
 
 	buf, err := io.ReadAll(f)
+	println("[readFile] path:", path, "bytes:", len(buf), "err:", err)
 	if err != nil {
 		return "", err
 	}
@@ -1038,6 +1039,62 @@ func (m *SSHManager) WriteFile(sessionId string, path string, content string) er
 	return err
 }
 
+// WriteFileBytes writes raw bytes to a file via SFTP (for drag-drop uploads)
+// dataBase64 is base64-encoded because Wails v2 does not support []int/[]byte in bindings
+func (m *SSHManager) WriteFileBytes(sessionId string, path string, dataBase64 string) error {
+	m.mu.Lock()
+	s, ok := m.sessions[sessionId]
+	m.mu.Unlock()
+	if !ok {
+		return fmt.Errorf("session not found")
+	}
+
+	bytes, err := base64.StdEncoding.DecodeString(dataBase64)
+	if err != nil {
+		return fmt.Errorf("decode base64: %w", err)
+	}
+
+	println("[writeBytes] path:", path, "base64 len:", len(dataBase64), "decoded bytes:", len(bytes))
+
+	f, err := s.SFTP.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = f.Write(bytes)
+	return err
+}
+
+// OpenWithLocalEditor downloads a remote file to Downloads and opens it with the OS default app
+func (m *SSHManager) OpenWithLocalEditor(sessionId string, remotePath string) (string, error) {
+	m.mu.Lock()
+	s, ok := m.sessions[sessionId]
+	m.mu.Unlock()
+	if !ok {
+		return "", fmt.Errorf("session not found")
+	}
+
+	f, err := s.SFTP.Open(remotePath)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	home, _ := os.UserHomeDir()
+	downloads := filepath.Join(home, "Downloads")
+	localPath := filepath.Join(downloads, filepath.Base(remotePath))
+
+	dst, err := os.Create(localPath)
+	if err != nil {
+		return "", err
+	}
+	defer dst.Close()
+	io.Copy(dst, f)
+
+	return localPath, nil
+}
+
 func (m *SSHManager) DeleteItem(sessionId string, path string, isDir bool) error {
 	m.mu.Lock()
 	s, ok := m.sessions[sessionId]
@@ -1051,6 +1108,73 @@ func (m *SSHManager) DeleteItem(sessionId string, path string, isDir bool) error
 		return err
 	}
 	return s.SFTP.Remove(path)
+}
+
+// EditWithLocalEditor downloads to temp, opens in system editor, watches for changes, auto-uploads back
+func (m *SSHManager) EditWithLocalEditor(sessionId string, remotePath string) (string, error) {
+	m.mu.Lock()
+	s, ok := m.sessions[sessionId]
+	m.mu.Unlock()
+	if !ok {
+		return "", fmt.Errorf("session not found")
+	}
+
+	f, err := s.SFTP.Open(remotePath)
+	if err != nil {
+		return "", err
+	}
+
+	// 写入临时文件
+	tmpFile, err := os.CreateTemp("", "aether-edit-*"+filepath.Ext(remotePath))
+	if err != nil {
+		f.Close()
+		return "", err
+	}
+	localPath := tmpFile.Name()
+	io.Copy(tmpFile, f)
+	tmpFile.Close()
+	f.Close()
+
+	// 后台监控：文件 mtime 改变后自动上传
+	go func() {
+		var lastMod time.Time
+		if info, err := os.Stat(localPath); err == nil {
+			lastMod = info.ModTime()
+		}
+		for {
+			time.Sleep(2 * time.Second)
+			info, err := os.Stat(localPath)
+			if err != nil {
+				os.Remove(localPath)
+				return
+			}
+			if info.ModTime().After(lastMod) {
+				lastMod = info.ModTime()
+				// 上传到原始远程路径（覆盖，不重命名）
+				src, err := os.Open(localPath)
+				if err != nil {
+					continue
+				}
+				m.mu.Lock()
+				s, ok := m.sessions[sessionId]
+				m.mu.Unlock()
+				if !ok {
+					src.Close()
+					return
+				}
+				dst, err := s.SFTP.Create(remotePath) // 直接覆盖原文件
+				if err != nil {
+					src.Close()
+					continue
+				}
+				io.Copy(dst, src)
+				dst.Close()
+				src.Close()
+			}
+		}
+	}()
+
+	return localPath, nil
 }
 
 func (m *SSHManager) Mkdir(sessionId string, path string) error {
@@ -1118,6 +1242,7 @@ func (m *SSHManager) UploadFile(sessionId string, localPath string, remotePath s
 	defer src.Close()
 
 	destPath := filepath.ToSlash(filepath.Join(remotePath, filepath.Base(localPath)))
+	println("[upload] src:", localPath, "->", destPath)
 	dst, err := s.SFTP.Create(destPath)
 	if err != nil {
 		return err

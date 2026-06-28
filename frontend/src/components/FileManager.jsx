@@ -47,10 +47,12 @@ function fileIcon(name, isDir) {
 function isEditable(name) {
   const ext = (name.split('.').pop() || '').toLowerCase();
   const editable = [
-    'txt', 'md', 'log', 'json', 'yaml', 'yml', 'toml', 'ini', 'env', 'conf', 'config',
+    'txt', 'md', 'log', 'json', 'yaml', 'yml', 'toml', 'ini', 'env', 'conf', 'config', 'cfg',
     'js', 'jsx', 'ts', 'tsx', 'py', 'rb', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'cs',
     'php', 'html', 'css', 'scss', 'less', 'xml', 'sql', 'sh', 'bash', 'zsh', 'vue', 'svelte',
-    'nginx', 'gitignore', 'dockerfile', 'makefile',
+    'bat', 'ps1', 'psm1', 'properties', 'lock', 'pub', 'cmake', 'gradle', 'toml',
+    'nginx', 'gitignore', 'dockerfile', 'makefile', 'editorconfig', 'prettierrc', 'eslintrc',
+    'csv', 'tsv', 'rst', 'tex', 'lua', 'pl', 'r', 'swift', 'kt', 'scala', 'dart',
   ];
   if (editable.includes(ext)) return true;
   // No extension (like Dockerfile, Makefile)
@@ -65,7 +67,7 @@ function isArchive(name) {
 }
 
 // Context menu component
-function ContextMenu({ pos, item, onClose, onCopyPath, onDownload, onEdit, onRename, onDelete, onMkdir, onCompress, onUncompress, t }) {
+function ContextMenu({ pos, item, onClose, onCopyPath, onDownload, onEdit, onRename, onDelete, onMkdir, onCompress, onUncompress, onOpenLocal, t }) {
   const ref = useRef(null);
   useEffect(() => {
     const handler = (e) => {
@@ -89,6 +91,11 @@ function ContextMenu({ pos, item, onClose, onCopyPath, onDownload, onEdit, onRen
       {item && !item.isDirectory && (
         <div className="context-menu-item" onClick={onDownload}>
           <span>⬇️</span> {t('下载到本地')}
+        </div>
+      )}
+      {item && !item.isDirectory && (
+        <div className="context-menu-item" onClick={onOpenLocal}>
+          <span>🖥</span> {t('本地编辑器打开')}
         </div>
       )}
       {item && canCopyRemotePath(item) && (
@@ -284,6 +291,18 @@ export default function FileManager({ sessionId, addToast }) {
     }
   };
 
+  // Open file with local system editor
+  const handleOpenLocal = async (item) => {
+    const remotePath = buildRemotePath(currentPath, item.name);
+    try {
+      await AppGo.EditWithLocalEditor(sessionId, remotePath);
+      addToast(`已在本地编辑器打开 ${item.name}，修改保存后自动同步`, 'success', 3000);
+    } catch (err) {
+      addToast(`打开失败: ${err}`, 'error');
+    }
+    closeContextMenu();
+  };
+
   // Save file from editor
   const handleSaveFile = async (path, content) => {
     try {
@@ -387,9 +406,40 @@ export default function FileManager({ sessionId, addToast }) {
 
   const closeContextMenu = () => setContextMenu(null);
 
+  // Drag-and-drop upload
+  const handleDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
+  const handleDrop = async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const files = e.dataTransfer?.files;
+    if (!files || files.length === 0) return;
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      try {
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const dataUrl = reader.result;
+            resolve(dataUrl.split(',')[1]); // 去掉 "data:mime;base64," 前缀
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(f);
+        });
+        setTransferInfo({ name: f.name, progress: 0, direction: 'upload' });
+        await AppGo.WriteFileBytes(sessionId, buildRemotePath(currentPath, f.name), base64);
+        addToast(`${f.name} 上传成功`, 'success');
+      } catch (err) {
+        addToast(`${f.name} 失败: ${err}`, 'error', 4000);
+      }
+    }
+    setTransferInfo(null);
+    loadDir(currentPath);
+  };
+
   return (
     <div
       className="file-manager"
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
       onContextMenu={(e) => {
         e.preventDefault();
         setContextMenu({ pos: { x: e.clientX, y: e.clientY }, item: null });
@@ -571,6 +621,7 @@ export default function FileManager({ sessionId, addToast }) {
           onClose={closeContextMenu}
           onCopyPath={() => { handleCopyPath(contextMenu.item); closeContextMenu(); }}
           onDownload={() => { handleDownload(contextMenu.item); closeContextMenu(); }}
+          onOpenLocal={() => { handleOpenLocal(contextMenu.item); }}
           onEdit={() => { handleEdit(contextMenu.item); closeContextMenu(); }}
           onRename={() => { startRename(contextMenu.item); closeContextMenu(); }}
           onDelete={() => { handleDelete(contextMenu.item); closeContextMenu(); }}

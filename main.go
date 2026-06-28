@@ -85,8 +85,8 @@ func main() {
 		OnStartup:        app.startup,
 		// 拦截窗口关闭：隐藏到后台而非退出
 		OnBeforeClose: func(ctx context.Context) bool {
-			runtime.WindowHide(ctx)
-			return true // return true = 取消关闭，由 WindowHide 处理
+			runtime.WindowMinimise(ctx) // 最小化而非隐藏，防止 WebView2 挂起导致进程残留
+			return true
 		},
 		Bind: []interface{}{
 			app,

@@ -10,6 +10,7 @@ import { xml } from '@codemirror/lang-xml';
 import { sql } from '@codemirror/lang-sql';
 import { StreamLanguage } from '@codemirror/language';
 import { shell } from '@codemirror/legacy-modes/mode/shell';
+import { search } from '@codemirror/search';
 
 // 根据文件扩展名返回对应的 CodeMirror 语言
 function getLanguage(filename) {
@@ -24,6 +25,9 @@ function getLanguage(filename) {
     xml: xml(), svg: xml(),
     sql: sql(),
     sh: StreamLanguage.define(shell), bash: StreamLanguage.define(shell), zsh: StreamLanguage.define(shell),
+    yml: StreamLanguage.define(shell), yaml: StreamLanguage.define(shell), toml: StreamLanguage.define(shell),
+    ini: StreamLanguage.define(shell), conf: StreamLanguage.define(shell), cfg: StreamLanguage.define(shell),
+    env: StreamLanguage.define(shell), properties: StreamLanguage.define(shell),
   };
   return map[ext] || null;
 }
@@ -82,7 +86,7 @@ export default function FileEditor({ file, onSave, onClose, mode = 'modal' }) {
           height="100%"
           minHeight="200px"
           theme={oneDark}
-          extensions={lang ? [lang] : []}
+          extensions={lang ? [lang, search()] : [search()]}
           onChange={handleChange}
           style={{ fontSize: 14, height: '100%' }}
           basicSetup={{ lineNumbers: true, highlightActiveLineGutter: true, highlightSpecialChars: true, history: true, foldGutter: true, drawSelection: true, dropCursor: true, allowMultipleSelections: true, indentOnInput: true, syntaxHighlighting: true, bracketMatching: true, closeBrackets: true, autocompletion: true, rectangularSelection: true, crosshairCursor: false, highlightActiveLine: true, highlightSelectionMatches: true, closeBracketsKeymap: true, defaultKeymap: true, searchKeymap: true, historyKeymap: true, foldKeymap: true, completionKeymap: true, lintKeymap: true }}

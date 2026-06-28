@@ -533,7 +533,7 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
                 key={tab.id}
                 className={`sidebar-menu-item ${activeTab === tab.id ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab.id)}
-                style={{ padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}
+                style={{ padding: '8px 12px', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
               >
                 <span>{tab.icon}</span> {t.tabs[tab.id]}
               </div>

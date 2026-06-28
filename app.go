@@ -13,6 +13,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/gorilla/websocket"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -193,6 +194,21 @@ func (a *App) ReadFile(sessionId string, path string) (string, error) {
 	return a.sshManager.ReadFile(sessionId, path)
 }
 
+// WriteFileBytes writes raw bytes to a file via SFTP (drag-drop uploads)
+func (a *App) WriteFileBytes(sessionId string, path string, dataBase64 string) error {
+	return a.sshManager.WriteFileBytes(sessionId, path, dataBase64)
+}
+
+// EditWithLocalEditor downloads remote file to temp, opens in system editor, auto-syncs changes back
+func (a *App) EditWithLocalEditor(sessionId string, remotePath string) (string, error) {
+	localPath, err := a.sshManager.EditWithLocalEditor(sessionId, remotePath)
+	if err != nil {
+		return "", err
+	}
+	exec.Command("rundll32", "url.dll,FileProtocolHandler", localPath).Start()
+	return localPath, nil
+}
+
 // WriteFile writes content to a file via SFTP
 func (a *App) WriteFile(sessionId string, path string, content string) error {
 	return a.sshManager.WriteFile(sessionId, path, content)
@@ -221,6 +237,11 @@ func (a *App) CompressItem(sessionId string, remotePath string) error {
 // UncompressItem extracts an archive on the remote server
 func (a *App) UncompressItem(sessionId string, remotePath string) error {
 	return a.sshManager.UncompressItem(sessionId, remotePath)
+}
+
+// UploadFileFromPath uploads a specific local file to the remote dir, no dialog
+func (a *App) UploadFileFromPath(sessionId string, localPath string, remoteDir string) error {
+	return a.sshManager.UploadFile(sessionId, localPath, remoteDir)
 }
 
 // TODO: File upload/download using standard file dialogs in Wails
@@ -317,43 +338,23 @@ type downloadProgressReader struct {
 func (pr *downloadProgressReader) Read(p []byte) (int, error) {
 	n, err := pr.Reader.Read(p)
 	pr.downloaded += int64(n)
-
-	if pr.total > 0 {
-		now := time.Now()
-		if now.Sub(pr.lastEmit) >= 200*time.Millisecond || pr.downloaded == pr.total {
-			progress := int(float64(pr.downloaded) / float64(pr.total) * 100)
-			runtime.EventsEmit(pr.ctx, "app-update-progress", progress)
-			pr.lastEmit = now
+	now := time.Now()
+	if now.Sub(pr.lastEmit) >= 200*time.Millisecond || err != nil {
+		progress := 0
+		if pr.total > 0 {
+			progress = int(float64(pr.downloaded) / float64(pr.total) * 100)
 		}
+		runtime.EventsEmit(pr.ctx, "app-update-progress", progress)
+		pr.lastEmit = now
 	}
 	return n, err
 }
 
-// UpdateApp downloads the new exe from the given url, replaces the current running exe, and restarts the app.
+// detectProxy returns a proxy function that checks Windows system proxy settings
 func (a *App) UpdateApp(downloadUrl string, filename string) error {
-	// 使用自定义 HTTP 客户端，支持系统代理 + 30 秒超时
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-		},
-	}
-
-	// 尝试下载，直连失败则回退到 GitHub 镜像
-	download := func(url string) (*http.Response, error) {
-		req, _ := http.NewRequest("GET", url, nil)
-		req.Header.Set("User-Agent", "AetherSSH-Updater/1.0")
-		return client.Do(req)
-	}
-
-	resp, err := download(downloadUrl)
+	resp, err := http.Get(downloadUrl)
 	if err != nil {
-		// 直连失败，尝试 GitHub 加速镜像
-		mirrorUrl := "https://ghproxy.com/" + downloadUrl
-		resp, err = download(mirrorUrl)
-		if err != nil {
-			return fmt.Errorf("failed to download update: %w", err)
-		}
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -363,69 +364,51 @@ func (a *App) UpdateApp(downloadUrl string, filename string) error {
 
 	isSetup := strings.Contains(strings.ToLower(filename), "installer") || strings.Contains(strings.ToLower(filename), "setup")
 	var targetPath string
-	var exePath string
 
 	if isSetup {
 		targetPath = filepath.Join(os.TempDir(), filename)
 	} else {
 		exe, err := os.Executable()
 		if err != nil {
-			return fmt.Errorf("could not determine executable path: %w", err)
+			return err
 		}
-		exePath = exe
-		targetPath = exePath + ".update"
+		targetPath = exe + ".update"
 	}
 
 	out, err := os.Create(targetPath)
 	if err != nil {
-		return fmt.Errorf("could not create temporary update file: %w", err)
+		return err
 	}
 
-	progressReader := &downloadProgressReader{
-		Reader: resp.Body,
-		ctx:    a.ctx,
-		total:  resp.ContentLength,
-	}
-
-	// 2. 写入到带有进度的缓冲并存入 .update 临时文件
-	_, err = io.Copy(out, progressReader)
-	out.Close() // Ensure the file is completely flushed and closed
+	pr := &downloadProgressReader{Reader: resp.Body, ctx: a.ctx, total: resp.ContentLength}
+	_, err = io.Copy(out, pr)
+	out.Close()
 	if err != nil {
-		os.Remove(targetPath) // Cleanup on failure
-		return fmt.Errorf("failed to save update file: %w", err)
+		os.Remove(targetPath)
+		return err
 	}
 
-	// 3. 区分 Setup 还是 Portable 替换
 	if isSetup {
-		// 启动 Setup 安装向导，隐藏黑框
-		cmd := exec.Command("cmd.exe", "/C", "start", "", targetPath)
-		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-		if err := cmd.Start(); err != nil {
-			return fmt.Errorf("failed to start setup: %w", err)
-		}
-		// 退出当前应用以解除目录锁定
+		// 使用 Windows ShellExecute API 启动安装程序，不经过 cmd.exe
+		shellExecute := syscall.NewLazyDLL("shell32.dll").NewProc("ShellExecuteW")
+		shellExecute.Call(
+			0,                          // hwnd
+			uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr("open"))),
+			uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(targetPath))),
+			0, 0,                       // params, dir
+			5,                          // SW_SHOW = 5
+		)
 		os.Exit(0)
 		return nil
 	}
 
-	// Portable 热更替换逻辑
-	oldPath := exePath + ".old"
-	if err := os.Rename(exePath, oldPath); err != nil {
-		os.Remove(targetPath)
-		return fmt.Errorf("failed to rename current executable: %w", err)
-	}
-
-	if err := os.Rename(targetPath, exePath); err != nil {
-		os.Rename(oldPath, exePath)
-		return fmt.Errorf("failed to apply update file: %w", err)
-	}
-
-	cmd := exec.Command(exePath)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to restart application: %w", err)
-	}
-
+	exePath, _ := os.Executable()
+	bat := fmt.Sprintf("@echo off\r\nchcp 65001 >nul\r\ntimeout /t 2 /nobreak >nul\r\n:retry\r\ndel \"%s\" 2>nul\r\nif exist \"%s\" (timeout /t 1 /nobreak >nul & goto retry)\r\nmove \"%s\" \"%s\"\r\nstart \"\" \"%s\"\r\ndel \"%%~f0\" & exit", exePath, exePath, targetPath, exePath, exePath)
+	tmpBat := filepath.Join(os.TempDir(), "aether_update.bat")
+	os.WriteFile(tmpBat, []byte(bat), 0644)
+	cmd := exec.Command("cmd.exe", "/C", tmpBat)
+	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x08000000} // CREATE_NO_WINDOW
+	cmd.Start()
 	os.Exit(0)
 	return nil
 }

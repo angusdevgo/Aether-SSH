@@ -30,6 +30,10 @@ export function DownloadFile(arg1, arg2) {
   return window['go']['main']['App']['DownloadFile'](arg1, arg2);
 }
 
+export function EditWithLocalEditor(arg1, arg2) {
+  return window['go']['main']['App']['EditWithLocalEditor'](arg1, arg2);
+}
+
 export function GetConnections() {
   return window['go']['main']['App']['GetConnections']();
 }
@@ -126,8 +130,16 @@ export function UploadFile(arg1, arg2) {
   return window['go']['main']['App']['UploadFile'](arg1, arg2);
 }
 
+export function UploadFileFromPath(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UploadFileFromPath'](arg1, arg2, arg3);
+}
+
 export function WriteFile(arg1, arg2, arg3) {
   return window['go']['main']['App']['WriteFile'](arg1, arg2, arg3);
+}
+
+export function WriteFileBytes(arg1, arg2, arg3) {
+  return window['go']['main']['App']['WriteFileBytes'](arg1, arg2, arg3);
 }
 
 export function WriteTerminal(arg1, arg2) {
