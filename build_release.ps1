@@ -21,8 +21,8 @@ if (Test-Path $configPath) {
     Write-Host "Synced version $version to frontend config.js" -ForegroundColor Green
 }
 
-# Inject required paths
-$env:PATH = "$goPath;$nsisPath;" + $env:PATH
+# Inject required paths（含 wails CLI 所在目录 %USERPROFILE%\go\bin）
+$env:PATH = "$goPath;$nsisPath;$env:USERPROFILE\go\bin;" + $env:PATH
 
 Write-Host "`n[1/2] Compiling Portable Edition..." -ForegroundColor Yellow
 wails build -clean -upx

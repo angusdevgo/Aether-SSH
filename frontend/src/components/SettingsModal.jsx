@@ -164,6 +164,7 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
         // Find exe asset
         let downloadAssetUrl = '';
         let downloadFilename = '';
+        let downloadDigest = ''; // GitHub asset SHA-256（格式 sha256:hex），用于下载完整性校验
         if (data.assets && data.assets.length > 0) {
            let targetAsset = null;
            if (isPortable) {
@@ -179,6 +180,8 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
            if (targetAsset) {
                downloadAssetUrl = targetAsset.browser_download_url;
                downloadFilename = targetAsset.name;
+               // 提取 hex 摘要（兼容带 sha256: 前缀的格式）
+               downloadDigest = (targetAsset.digest || '').replace(/^sha256:/i, '');
            }
         }
 
@@ -201,7 +204,8 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
             hasUpdate: true,
             latestVersion: 'v' + latest,
             url: downloadAssetUrl || data.html_url,
-            filename: downloadFilename
+            filename: downloadFilename,
+            digest: downloadDigest
           });
           addToast(language === 'zh-CN' ? '发现新版本: v' + latest : 'New version found: v' + latest, 'success');
         } else {
@@ -227,7 +231,13 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
 
     setDownloadProgress(0);
     try {
-      await AppGo.UpdateApp(updateInfo.url, updateInfo.filename || 'update.exe');
+      if (!updateInfo.digest) {
+        // 资产无 SHA-256 摘要：拒绝自动更新，引导手动下载
+        window.runtime?.BrowserOpenURL(updateInfo.url);
+        setDownloadProgress(-1);
+        return;
+      }
+      await AppGo.UpdateApp(updateInfo.url, updateInfo.filename || 'update.exe', updateInfo.digest);
       // Backend automatically exits process on success
     } catch (err) {
       addToast((language === 'zh-CN' ? '更新失败: ' : 'Update failed: ') + err, 'error');
@@ -267,6 +277,7 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
   const [termBgImage, setTermBgImage] = useState(localStorage.getItem('termBgImage') || '');
   const [termBgOpacity, setTermBgOpacity] = useState(parseFloat(localStorage.getItem('termBgOpacity') || '0.15'));
   const [terminalColorTheme, setTerminalColorTheme] = useState(localStorage.getItem('terminalColorTheme') || 'aether');
+  const [terminalLocalEcho, setTerminalLocalEcho] = useState(localStorage.getItem('terminalLocalEcho') !== 'false');
 
   const t = I18N[language] || I18N['zh-CN'];
 
@@ -342,6 +353,14 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
     if (useCustomAccent) {
       document.documentElement.style.setProperty('--green', color);
     }
+  };
+
+  const handleToggleLocalEcho = () => {
+    const nextVal = !terminalLocalEcho;
+    setTerminalLocalEcho(nextVal);
+    // 注意：写入 'true'/'false' 字符串，Terminal.jsx 通过 getItem('terminalLocalEcho') !== 'false' 判断
+    localStorage.setItem('terminalLocalEcho', nextVal ? 'true' : 'false');
+    addToast(nextVal ? '已开启本地回显（输入即时显示，高延迟服务器推荐）' : '已关闭本地回显（等待服务器回显）', 'success');
   };
 
   const handleToggleAccent = () => {
@@ -515,10 +534,10 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal modal-xl" style={{ display: 'flex', flexDirection: 'column', height: '80vh', background: 'var(--bg-1)' }}>
+      <div className="modal modal-xl" style={{ display: 'flex', flexDirection: 'column', height: '80vh' }}>
         
         {/* Settings Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
+        <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px' }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-1)' }}>{t.title}</div>
           <button className="btn btn-ghost btn-icon" onClick={onClose} style={{ color: 'var(--text-3)' }}>✕</button>
         </div>
@@ -527,7 +546,7 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           
           {/* Settings Sidebar */}
-          <div style={{ width: 220, borderRight: '1px solid var(--border)', padding: '16px 8px', display: 'flex', flexDirection: 'column', gap: 4, background: 'var(--bg-0)' }}>
+          <div className="settings-sidebar" style={{ width: 220, padding: '16px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
             {TABS.map(tab => (
               <div 
                 key={tab.id}
@@ -541,7 +560,7 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
           </div>
 
           {/* Settings Content */}
-          <div style={{ flex: 1, padding: '32px 48px', overflowY: 'auto', background: 'var(--bg-1)' }}>
+          <div className="settings-content" style={{ flex: 1, padding: '32px 48px', overflowY: 'auto' }}>
             
             {activeTab === 'app' && (
               <div style={{ display: 'flex', flexDirection: 'column', padding: '16px 24px', gap: 32, maxWidth: 640 }}>
@@ -847,6 +866,38 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
                           style={{ cursor: 'pointer' }}
                         />
                         <span style={{ fontSize: 13, width: 32, textAlign: 'right', color: 'var(--text-1)' }}>{terminalFontSize}px</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── 本地回显 ── */}
+                <div>
+                  <h3 style={{ fontSize: 14, color: 'var(--text-1)', marginBottom: 12, fontWeight: 600 }}>本地回显</h3>
+                  <div className="form-group" style={{ background: 'var(--bg-2)', padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ color: 'var(--text-1)', fontSize: 13 }}>预测性本地回显</div>
+                        <div style={{ color: 'var(--text-4)', fontSize: 11, marginTop: 2 }}>输入时立即本地显示，不等服务器回显。高延迟服务器建议开启；若出现字符重复/抖动可关闭</div>
+                      </div>
+                      <div
+                        onClick={handleToggleLocalEcho}
+                        style={{
+                          width: 40, height: 24,
+                          background: terminalLocalEcho ? 'var(--green)' : 'var(--bg-4)',
+                          borderRadius: 12, position: 'relative', cursor: 'pointer',
+                          transition: 'background 0.2s ease',
+                          border: '1px solid var(--border)'
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute',
+                          left: terminalLocalEcho ? 18 : 2,
+                          top: 1, width: 20, height: 20,
+                          background: '#fff', borderRadius: '50%',
+                          transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+                        }} />
                       </div>
                     </div>
                   </div>

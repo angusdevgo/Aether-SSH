@@ -540,9 +540,13 @@ func (m *SSHManager) deployProbeScript(s *SessionData, sessionId string) error {
 	}
 
 	// Ensure ~/.aether directory exists
+	// 目录权限 0700：防止同机其他用户读取/篡改探针脚本（脚本仅当前用户需要执行）
 	if err := s.SFTP.MkdirAll(".aether"); err != nil {
 		// Non-fatal: fall back to /tmp/.aether
 		_ = s.SFTP.MkdirAll("/tmp/.aether")
+		_ = s.SFTP.Chmod("/tmp/.aether", 0700)
+	} else {
+		_ = s.SFTP.Chmod(".aether", 0700)
 	}
 
 	// Write the script file
@@ -561,8 +565,8 @@ func (m *SSHManager) deployProbeScript(s *SessionData, sessionId string) error {
 		return err
 	}
 
-	// Make executable
-	_ = s.SFTP.Chmod(scriptPath, 0755)
+	// 脚本权限 0700：仅属主可读可执行，防止同机其他用户篡改探针内容
+	_ = s.SFTP.Chmod(scriptPath, 0700)
 
 	m.mu.Lock()
 	m.probeDeployed[sessionId] = true

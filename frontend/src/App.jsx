@@ -17,7 +17,7 @@ import GlobalContextMenu from './components/GlobalContextMenu.jsx';
 import { clampPanelWidth } from './components/probeFormatting.js';
 import { useTranslation } from './i18n.js';
 import { APP_VERSION } from './config.js';
-import { Settings, House, Key, Minus, Square, X, RefreshCw, Wifi, Monitor, Eye, EyeOff } from 'lucide-react';
+import { Settings, House, Key, Minus, Square, X, RefreshCw, Wifi, Monitor, Eye, EyeOff, LayoutGrid, List, Plus, Terminal as TerminalIcon, Folder, History, Zap, Plug, Layout } from 'lucide-react';
 
 import logoImg from './assets/logo.png';
 
@@ -134,6 +134,9 @@ export default function App() {
   // ────────────────────────────────────────────────────────
 
   const pingTimerRef = useRef(null);
+  // 不可达服务器冷却表：记录最近确认不可达的时间，冷却期内跳过重试，
+  // 避免对宕机/防火墙拦截的服务器每 2 秒持续发起 TCP 连接尝试（污染本地网络栈、干扰其他连接）
+  const pingFailCooldownRef = useRef({});
 
   // ── 新增主页仪表盘状态 ──────────────────────────────────
   const [recentServers, setRecentServers] = useState([]);
@@ -205,6 +208,7 @@ export default function App() {
             }
             let downloadAssetUrl = '';
             let downloadFilename = '';
+            let downloadDigest = ''; // GitHub asset SHA-256（格式 sha256:hex），用于下载完整性校验
             if (data.assets && data.assets.length > 0) {
                let targetAsset = null;
                if (isPortable) {
@@ -220,12 +224,15 @@ export default function App() {
                if (targetAsset) {
                    downloadAssetUrl = targetAsset.browser_download_url;
                    downloadFilename = targetAsset.name;
+                   // 提取 hex 摘要（兼容带 sha256: 前缀的格式）
+                   downloadDigest = (targetAsset.digest || '').replace(/^sha256:/i, '');
                }
             }
             setStartupUpdateInfo({
               version: 'v' + latest,
               url: downloadAssetUrl || data.html_url,
               filename: downloadFilename || 'update.exe',
+              digest: downloadDigest,
               body: data.body || '',
             });
             setIsUpdateModalVisible(true);
@@ -260,7 +267,13 @@ export default function App() {
 
     setDownloadProgress(0);
     try {
-      await AppGo.UpdateApp(startupUpdateInfo.url, startupUpdateInfo.filename);
+      if (!startupUpdateInfo.digest) {
+        // 资产无 SHA-256 摘要（GitHub 未生成或为旧资产）：拒绝自动更新，引导手动下载
+        window.runtime?.BrowserOpenURL(startupUpdateInfo.url);
+        setIsUpdateModalVisible(false);
+        return;
+      }
+      await AppGo.UpdateApp(startupUpdateInfo.url, startupUpdateInfo.filename, startupUpdateInfo.digest);
     } catch (err) {
       setDownloadProgress(-1);
       addToast(`自动更新失败 — 请使用「手动下载」`, 'error', 4000);
@@ -444,9 +457,20 @@ export default function App() {
     const results = await Promise.all(
       servers.map(async (s) => {
         try {
+          // 冷却：15 秒内已确认不可达的服务器跳过重试
+          const lastFail = pingFailCooldownRef.current[s.id];
+          if (lastFail && Date.now() - lastFail < 15000) {
+            return { id: s.id, online: false, latency: null };
+          }
           const res = await AppGo.PingServer(s.host, s.port || 22);
+          if (res && res.online) {
+            delete pingFailCooldownRef.current[s.id];
+          } else {
+            pingFailCooldownRef.current[s.id] = Date.now();
+          }
           return { id: s.id, ...res };
         } catch {
+          pingFailCooldownRef.current[s.id] = Date.now();
           return { id: s.id, online: false, latency: null };
         }
       })
@@ -604,7 +628,7 @@ export default function App() {
       {/* ── Topbar ───────────────────────────────────────── */}
       <div className="topbar">
         <div className="topbar-content">
-          <div className="topbar-logo" style={{ marginLeft: 8, cursor: 'pointer' }} onClick={() => { setActiveSessionId(null); setShowSettings(false); }}>
+          <div className="topbar-logo no-drag" style={{ marginLeft: 8, cursor: 'pointer' }} onClick={() => { setActiveSessionId(null); setShowSettings(false); }}>
             <img src={logoImg} alt="logo" />
             <div className="topbar-title" style={{ userSelect: 'none' }}>Aether</div>
           </div>
@@ -688,7 +712,16 @@ export default function App() {
                       ⟳
                     </span>
                   )}
-                  <span className="tab-close no-drag" onClick={(e) => closeSession(s.id, e)}>✕</span>
+                  <span
+                    className="tab-close no-drag"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeSession(s.id, e);
+                    }}
+                    title="关闭标签页"
+                  >
+                    <X size={12} />
+                  </span>
                 </div>
               ))}
             </div>
@@ -812,30 +845,31 @@ export default function App() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span className="section-title-icon">🖥</span>
                     <span className="section-title">{t('主机')}</span>
-                    <div className="view-mode-toggles" style={{ display: 'flex', background: 'var(--bg-2)', borderRadius: 6, padding: 2 }}>
+                    <div className="view-mode-toggles" style={{ display: 'flex', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 6, padding: 2 }}>
                       <button
                         className={`btn-icon ${serverListViewMode === 'grid' ? 'active' : ''}`}
                         onClick={() => { setServerListViewMode('grid'); localStorage.setItem('serverListViewMode', 'grid'); }}
                         title="卡片视图"
-                        style={{ padding: '2px 6px', fontSize: 12, background: serverListViewMode === 'grid' ? 'var(--bg-3)' : 'transparent', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                        style={{ padding: '4px 8px', fontSize: 12, background: serverListViewMode === 'grid' ? 'var(--bg-4)' : 'transparent', color: serverListViewMode === 'grid' ? 'var(--text-1)' : 'var(--text-4)', border: 'none', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                       >
-                        🔲
+                        <LayoutGrid size={14} />
                       </button>
                       <button
                         className={`btn-icon ${serverListViewMode === 'table' ? 'active' : ''}`}
                         onClick={() => { setServerListViewMode('table'); localStorage.setItem('serverListViewMode', 'table'); }}
                         title="列表视图"
-                        style={{ padding: '2px 6px', fontSize: 12, background: serverListViewMode === 'table' ? 'var(--bg-3)' : 'transparent', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                        style={{ padding: '4px 8px', fontSize: 12, background: serverListViewMode === 'table' ? 'var(--bg-4)' : 'transparent', color: serverListViewMode === 'table' ? 'var(--text-1)' : 'var(--text-4)', border: 'none', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                       >
-                        📄
+                        <List size={14} />
                       </button>
                     </div>
                   </div>
                   <button
                     className="btn btn-primary btn-sm"
-                    style={{ marginLeft: 'auto', fontSize: 12, padding: '4px 12px' }}
+                    style={{ marginLeft: 'auto', fontSize: 12, padding: '4px 12px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                     onClick={() => { setEditServer(null); setShowAddServer(true); }}
                   >
+                    <Plus size={14} />
                     {t('添加')}
                   </button>
                 </div>
@@ -860,13 +894,14 @@ export default function App() {
         <div style={{ display: activeSessionId !== null ? 'flex' : 'none', flexDirection: 'column', height: '100%', flex: 1 }}>
             {/* Content Type Tabs */}
             {activeSession && (
-              <div className="content-tab-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingRight: 16 }}>
-                <div style={{ display: 'flex', gap: 2 }}>
+              <div className="content-tab-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 36, paddingRight: 16, borderBottom: '1px solid var(--border)', background: 'var(--bg-1)' }}>
+                <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                   <button
                     className={`content-tab ${contentTab === 'terminal' ? 'active' : ''}`}
                     onClick={() => setContentTab('terminal')}
                   >
-                    🖥 {t('终端')}
+                    <TerminalIcon size={14} />
+                    <span>{t('终端')}</span>
                   </button>
                   {fileManagerPosition === 'tab' && (
                     <button
@@ -874,7 +909,8 @@ export default function App() {
                       onClick={() => setContentTab('files')}
                       disabled={activeSession.status !== 'connected'}
                     >
-                      📁 {t('文件管理')}
+                      <Folder size={14} />
+                      <span>{t('文件管理')}</span>
                     </button>
                   )}
                   <button
@@ -882,30 +918,33 @@ export default function App() {
                     onClick={() => setContentTab('history')}
                     disabled={activeSession.status !== 'connected'}
                   >
-                    📜 {t('历史指令')}
+                    <History size={14} />
+                    <span>{t('历史指令')}</span>
                   </button>
                   <button
                     className={`content-tab ${contentTab === 'quick' ? 'active' : ''}`}
                     onClick={() => setContentTab('quick')}
                     disabled={activeSession.status !== 'connected'}
                   >
-                    ⚡ 快捷命令
+                    <Zap size={14} />
+                    <span>{t('快捷命令')}</span>
                   </button>
                   <button
                     className={`content-tab ${contentTab === 'forward' ? 'active' : ''}`}
                     onClick={() => setContentTab('forward')}
                     disabled={activeSession.status !== 'connected'}
                   >
-                    🔌 端口转发
+                    <Plug size={14} />
+                    <span>{t('端口转发')}</span>
                   </button>
                 </div>
                 
                 {activeSession.status === 'connected' && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 4 }}>
-                    <span style={{ fontSize: 12, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{t('文件管理器布局')}:</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 11.5, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{t('文件管理器布局')}:</span>
                     <select
                       className="select-compact"
-                      style={{ padding: '2px 8px', fontSize: 12, height: 24 }}
+                      style={{ padding: '0 8px', fontSize: 11.5, height: 26, borderRadius: 5 }}
                       value={fileManagerPosition}
                       onChange={(e) => {
                         const val = e.target.value;

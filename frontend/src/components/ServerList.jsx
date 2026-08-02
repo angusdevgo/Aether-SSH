@@ -124,124 +124,87 @@ export default function ServerList({
           const latClass = ping ? LATENCY_CLASS(ping.latency) : 'offline';
           const active = isActive(server);
           const connected = hasSession(server);
-          // 优先用实际查询到的 osInfo
           const sessionForServer = sessions.find(s => s.serverId === server.id && s.status === 'connected');
           const osInfo = getOSInfo(server.name, server.os, sessionForServer?.osInfo || null);
-          const isHovered = hoveredId === server.id;
 
           return (
             <div
               key={server.id}
-              className={`server-card ${active ? 'active' : ''}`}
+              className={`server-card-modern ${active ? 'active' : ''}`}
               onClick={() => onConnect(server)}
               onContextMenu={(e) => handleContextMenu(e, server)}
               onMouseEnter={() => setHoveredId(server.id)}
               onMouseLeave={() => setHoveredId(null)}
               title={`${server.username}@${server.host}:${server.port || 22}`}
-              style={{
-                margin: 0,
-                // 亚克力效果
-                background: active
-                  ? 'rgba(16, 185, 129, 0.12)'
-                  : isHovered
-                  ? 'rgba(255,255,255,0.08)'
-                  : 'rgba(255,255,255,0.04)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                border: active
-                  ? '1px solid rgba(16,185,129,0.4)'
-                  : '1px solid rgba(255,255,255,0.08)',
-                transition: 'all 0.18s ease',
-                boxShadow: active
-                  ? '0 4px 20px rgba(16,185,129,0.15)'
-                  : isHovered
-                  ? '0 4px 16px rgba(0,0,0,0.25)'
-                  : '0 2px 8px rgba(0,0,0,0.15)',
-              }}
             >
               {/* OS 系统图标 */}
               <div style={{
-                width: 42,
-                height: 42,
+                width: 40,
+                height: 40,
                 borderRadius: 12,
                 background: osInfo.bg,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 22,
+                fontSize: 20,
+                color: '#fff',
                 flexShrink: 0,
-                boxShadow: `0 4px 12px ${osInfo.bg}55`,
+                boxShadow: `0 4px 14px ${osInfo.bg}44`,
               }}>
                 {osInfo.icon}
               </div>
 
-              <div className="server-info" style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 0 }}>
-                <div className="server-name" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+              <div className="server-info" style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>
+                <div className="server-name" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {server.name || server.host}
                   </span>
                   {connected && (
-                    <span style={{ fontSize: 8, color: 'var(--green)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
+                    <span className="status-conn-badge">
                       ● CONN
                     </span>
                   )}
                 </div>
-                <div className="server-host" style={{ color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div className="server-host" style={{ color: 'var(--text-3)', fontSize: 11, fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {server.username}@{server.host}
                 </div>
               </div>
 
-              {/* 右侧：延迟 + 编辑按钮 */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              {/* 右侧：延迟 + 操作按钮 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                 {ping?.online && ping?.latency !== undefined && ping?.latency !== null ? (
-                  <>
-                    <span style={{
-                      fontSize: 11,
-                      fontFamily: 'var(--font-mono)',
-                      color: latClass === 'good' ? '#4ade80'
-                           : latClass === 'warn' ? '#facc15'
-                           : '#f87171',
-                    }}>
-                      {ping.latency === -1 ? '<1ms' : `${ping.latency}ms`}
-                    </span>
-                    <div style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      background: latClass === 'good' ? '#4ade80'
-                                : latClass === 'warn' ? '#facc15'
-                                : '#f87171',
-                      boxShadow: latClass === 'good' ? '0 0 8px #4ade80'
-                               : latClass === 'warn' ? '0 0 8px #facc15'
-                               : '0 0 8px #f87171',
-                    }} />
-                  </>
+                  <div className={`latency-pill ${latClass}`}>
+                    <div className={`latency-dot ${latClass}`} />
+                    <span>{ping.latency === -1 ? '<1ms' : `${ping.latency}ms`}</span>
+                  </div>
                 ) : (
                   ping !== undefined && !ping?.online ? (
-                    <span style={{ fontSize: 14, color: '#f87171', fontWeight: 'bold', lineHeight: 1 }} title="服务器离线或不可达">✕</span>
+                    <div className="latency-pill offline" title="服务器离线或不可达">
+                      <div className="latency-dot bad" />
+                      <span>离线</span>
+                    </div>
                   ) : null
                 )}
 
-                {/* 编辑按钮 */}
-                <button
-                  onClick={(e) => { e.stopPropagation(); onEdit(server); }}
-                  title="编辑服务器"
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '4px 6px',
-                    borderRadius: 6,
-                    color: isHovered ? 'var(--text-2)' : 'var(--text-4)',
-                    fontSize: 14,
-                    opacity: isHovered ? 1 : 0,
-                    transition: 'all 0.15s',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Pencil size={14} />
-                </button>
+                {/* 悬浮快捷操作按钮组 */}
+                <div className="server-quick-actions">
+                  <button
+                    className="btn-action-icon"
+                    onClick={(e) => { e.stopPropagation(); onEdit(server); }}
+                    title="编辑服务器"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  {onDelete && (
+                    <button
+                      className="btn-action-icon danger"
+                      onClick={(e) => { e.stopPropagation(); onDelete(server.id); }}
+                      title="删除服务器"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -281,46 +244,61 @@ export default function ServerList({
                 >
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 20, height: 20, color: osInfo.bg }}>{osInfo.icon}</div>
+                      <div style={{ width: 22, height: 22, color: osInfo.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{osInfo.icon}</div>
                       <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{osInfo.label}</span>
                     </div>
                   </td>
-                  <td style={{ fontWeight: 500, color: 'var(--text-1)' }}>
+                  <td style={{ fontWeight: 600, color: 'var(--text-1)' }}>
                     {server.name || server.host}
-                    {connected && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--green)', padding: '2px 4px', background: 'var(--green-dim)', borderRadius: 4 }}>CONN</span>}
+                    {connected && <span className="status-conn-badge" style={{ marginLeft: 6 }}>● CONN</span>}
                   </td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-2)' }}>
+                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-2)' }}>
                     {server.host}:{server.port || 22}
                   </td>
-                  <td style={{ color: 'var(--text-2)' }}>{server.username}</td>
+                  <td style={{ color: 'var(--text-2)', fontSize: 12 }}>{server.username}</td>
                   <td>
                     {ping?.online && ping?.latency !== undefined && ping?.latency !== null ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{
-                          width: 8, height: 8, borderRadius: '50%',
-                          background: latClass === 'good' ? '#4ade80' : latClass === 'warn' ? '#facc15' : '#f87171'
-                        }} />
-                        <span style={{ fontSize: 12, color: latClass === 'good' ? '#4ade80' : latClass === 'warn' ? '#facc15' : '#f87171', fontFamily: 'var(--font-mono)' }}>
-                          {ping.latency === -1 ? '<1ms' : `${ping.latency}ms`}
-                        </span>
+                      <div className={`latency-pill ${latClass}`}>
+                        <div className={`latency-dot ${latClass}`} />
+                        <span>{ping.latency === -1 ? '<1ms' : `${ping.latency}ms`}</span>
                       </div>
                     ) : (
                       ping !== undefined && !ping?.online ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f87171' }}>
-                          <span style={{ fontSize: 14, fontWeight: 'bold' }}>✕</span>
-                          <span style={{ fontSize: 12 }}>Offline</span>
+                        <div className="latency-pill offline">
+                          <div className="latency-dot bad" />
+                          <span>离线</span>
                         </div>
                       ) : <span style={{ color: 'var(--text-4)' }}>-</span>
                     )}
                   </td>
                   <td>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onEdit(server); }}
-                      className="btn btn-ghost btn-sm"
-                      style={{ padding: '4px 8px', fontSize: 12 }}
-                    >
-                      编辑
-                    </button>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onConnect(server); }}
+                        className="btn btn-primary btn-sm"
+                        style={{ padding: '3px 10px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      >
+                        <Link size={12} /> 连接
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onEdit(server); }}
+                        className="btn btn-ghost btn-sm"
+                        style={{ padding: '3px 8px', fontSize: 11 }}
+                        title="编辑服务器"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      {onDelete && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onDelete(server.id); }}
+                          className="btn btn-ghost btn-sm"
+                          style={{ padding: '3px 8px', fontSize: 11, color: 'var(--red)' }}
+                          title="删除服务器"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

@@ -46,8 +46,8 @@ export function GetWebdavConfig() {
   return window['go']['main']['App']['GetWebdavConfig']();
 }
 
-export function GetWsPort() {
-  return window['go']['main']['App']['GetWsPort']();
+export function GetWsConnectionInfo() {
+  return window['go']['main']['App']['GetWsConnectionInfo']();
 }
 
 export function IsPortableVersion() {
@@ -122,8 +122,8 @@ export function UncompressItem(arg1, arg2) {
   return window['go']['main']['App']['UncompressItem'](arg1, arg2);
 }
 
-export function UpdateApp(arg1, arg2) {
-  return window['go']['main']['App']['UpdateApp'](arg1, arg2);
+export function UpdateApp(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateApp'](arg1, arg2, arg3);
 }
 
 export function UploadFile(arg1, arg2) {

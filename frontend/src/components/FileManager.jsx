@@ -3,6 +3,7 @@ import * as AppGo from '../../wailsjs/go/main/App.js';
 import FileEditor from './FileEditor.jsx';
 import { buildRemotePath, canCopyRemotePath } from './fileManagerPaths.js';
 import { useTranslation } from '../i18n.js';
+import { FolderPlus, Upload, RefreshCw, ExternalLink, Pencil, Download, Trash2, Edit3 } from 'lucide-react';
 
 // 格式化文件大小
 function fmtSize(bytes) {
@@ -462,20 +463,23 @@ export default function FileManager({ sessionId, addToast }) {
           ))}
         </div>
 
-        <button className="btn btn-secondary btn-sm" onClick={handleMkdir}>📁 {t('新建文件夹')}</button>
+        <button className="btn btn-secondary btn-sm" onClick={handleMkdir}>
+          <FolderPlus size={13} />
+          <span>{t('新建文件夹')}</span>
+        </button>
         <button className="btn btn-secondary btn-sm" onClick={handleUpload}>
-          ⬆ {t('上传文件')}
+          <Upload size={13} />
+          <span>{t('上传文件')}</span>
         </button>
         <button
           className="btn btn-ghost btn-sm btn-icon"
           title="刷新"
           onClick={() => loadDir(currentPath)}
         >
-          ↻
+          <RefreshCw size={13} />
         </button>
         <button
           className="btn btn-ghost btn-sm"
-          style={{ fontSize: 11, marginLeft: 4 }}
           title={editMode === 'modal' ? '切换为分屏编辑' : '切换为弹窗编辑'}
           onClick={() => {
             const next = editMode === 'modal' ? 'split' : 'modal';
@@ -483,7 +487,8 @@ export default function FileManager({ sessionId, addToast }) {
             localStorage.setItem('editMode', next);
           }}
         >
-          {editMode === 'modal' ? '🪟 弹窗' : '📐 分屏'}
+          <ExternalLink size={13} />
+          <span>{editMode === 'modal' ? '弹窗' : '分屏'}</span>
         </button>
       </div>
 
@@ -586,26 +591,26 @@ export default function FileManager({ sessionId, addToast }) {
                     className="btn btn-ghost btn-sm btn-icon"
                     title="编辑"
                     onClick={(e) => { e.stopPropagation(); handleEdit(item); }}
-                  >✏️</button>
+                  ><Pencil size={13} /></button>
                 )}
                 {!item.isDirectory && (
                   <button
                     className="btn btn-ghost btn-sm btn-icon"
                     title="下载到本地"
                     onClick={(e) => { e.stopPropagation(); handleDownload(item); }}
-                  >⬇️</button>
+                  ><Download size={13} /></button>
                 )}
                 <button
                   className="btn btn-ghost btn-sm btn-icon"
                   title="重命名"
                   onClick={(e) => { e.stopPropagation(); startRename(item); }}
-                >✏</button>
+                ><Edit3 size={13} /></button>
                 <button
                   className="btn btn-ghost btn-sm btn-icon"
                   title="删除"
                   style={{ color: 'var(--red)' }}
                   onClick={(e) => { e.stopPropagation(); handleDelete(item); }}
-                >🗑</button>
+                ><Trash2 size={13} /></button>
               </div>
             </div>
           );

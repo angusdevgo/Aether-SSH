@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -9,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -25,6 +30,7 @@ type App struct {
 	sshManager    *SSHManager
 	configManager *ConfigManager
 	wsPort        int
+	wsToken       string                        // 随机鉴权 token，防止本地恶意进程劫持终端通道
 	wsMu          sync.Mutex
 	wsConns       map[string]*websocket.Conn // sessionId -> active WebSocket
 }
@@ -47,14 +53,74 @@ func (a *App) startup(ctx context.Context) {
 
 	// ── 启动本地 WebSocket 终端服务器 ─────────────────────────────────
 	// 不经过 Wails IPC，直接走 TCP loopback，延迟极低
+	// 生成随机鉴权 token：sessionId 可预测，若通道无鉴权，本地恶意网页/进程
+	// 可连接 ws://127.0.0.1:port 向 SSH 会话注入任意命令（本地 RCE）。
+	tokenBytes := make([]byte, 32)
+	_, _ = rand.Read(tokenBytes)
+	a.wsToken = hex.EncodeToString(tokenBytes)
+
 	mux := http.NewServeMux()
 	// 允许任何来源（WebView2 内部请求可能没有 Origin 头）
+	// 鉴权由启动时生成的随机 token 保证，见 checkWsToken
 	upgrader := websocket.Upgrader{
 		CheckOrigin:     func(r *http.Request) bool { return true },
 		ReadBufferSize:  4096,
 		WriteBufferSize: 32768,
 	}
-	mux.HandleFunc("/ws/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/ws/", a.handleWS(upgrader))
+
+	// 监听随机端口
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err == nil {
+		a.wsPort = listener.Addr().(*net.TCPAddr).Port
+		go func() {
+			_ = http.Serve(listener, mux)
+		}()
+	}
+
+	// Clean up old executable from a previous auto-update
+	exePath, err := os.Executable()
+	if err == nil {
+		dir := filepath.Dir(exePath)
+		files, err := os.ReadDir(dir)
+		if err == nil {
+			for _, file := range files {
+				if !file.IsDir() && strings.HasSuffix(file.Name(), ".old") {
+					os.Remove(filepath.Join(dir, file.Name()))
+				}
+			}
+		}
+	}
+}
+
+// GetWsConnectionInfo 返回本地 WebSocket 服务器连接信息（端口 + 随机鉴权 token）
+// token 仅在本次进程启动时有效，防止本地恶意进程/网页劫持终端通道
+func (a *App) GetWsConnectionInfo() map[string]interface{} {
+	return map[string]interface{}{
+		"port":  a.wsPort,
+		"token": a.wsToken,
+	}
+}
+
+// checkWsToken 使用恒定时间比较校验 WebSocket 鉴权 token，防止时序侧信道
+func (a *App) checkWsToken(token string) bool {
+	if a.wsToken == "" || token == "" {
+		return false
+	}
+	expected := []byte(a.wsToken)
+	got := []byte(token)
+	return len(expected) == len(got) && subtle.ConstantTimeCompare(expected, got) == 1
+}
+
+// handleWS 处理 WebSocket 升级请求：先校验 token，再注册会话并直通 SSH stdin
+func (a *App) handleWS(upgrader websocket.Upgrader) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// 鉴权：token 必须与启动时生成的随机值一致
+		if !a.checkWsToken(r.URL.Query().Get("token")) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		sessionId := strings.TrimPrefix(r.URL.Path, "/ws/")
 		if sessionId == "" {
 			http.Error(w, "missing sessionId", http.StatusBadRequest)
@@ -84,35 +150,7 @@ func (a *App) startup(ctx context.Context) {
 			}
 			a.sshManager.WriteBytes(sessionId, msg)
 		}
-	})
-
-	// 监听随机端口
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err == nil {
-		a.wsPort = listener.Addr().(*net.TCPAddr).Port
-		go func() {
-			_ = http.Serve(listener, mux)
-		}()
 	}
-
-	// Clean up old executable from a previous auto-update
-	exePath, err := os.Executable()
-	if err == nil {
-		dir := filepath.Dir(exePath)
-		files, err := os.ReadDir(dir)
-		if err == nil {
-			for _, file := range files {
-				if !file.IsDir() && strings.HasSuffix(file.Name(), ".old") {
-					os.Remove(filepath.Join(dir, file.Name()))
-				}
-			}
-		}
-	}
-}
-
-// GetWsPort 返回本地 WebSocket 服务器端口，前端用于连接终端
-func (a *App) GetWsPort() int {
-	return a.wsPort
 }
 
 // WriteWsToSession 将 WebSocket 输出写入给指定 session 的 WS 连接
@@ -350,8 +388,33 @@ func (pr *downloadProgressReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
+// safeUpdateFilenameRe 允许的更新文件名白名单：仅字母数字与 ._-（
+// 防止文件名被注入到临时 bat 脚本、路径或 ShellExecute 参数中）
+var safeUpdateFilenameRe = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+// isSafeUpdateFilename 校验更新文件名是否在白名单内（防命令注入）
+func isSafeUpdateFilename(name string) bool {
+	return name != "" && safeUpdateFilenameRe.MatchString(name)
+}
+
+// verifySha256Hex 校验实际下载内容的 SHA-256 与预期是否一致（忽略大小写）
+func verifySha256Hex(gotHex, expectedHex string) error {
+	if expectedHex == "" {
+		return fmt.Errorf("missing expected sha256 checksum, update refused")
+	}
+	if !strings.EqualFold(gotHex, expectedHex) {
+		return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedHex, gotHex)
+	}
+	return nil
+}
+
 // detectProxy returns a proxy function that checks Windows system proxy settings
-func (a *App) UpdateApp(downloadUrl string, filename string) error {
+func (a *App) UpdateApp(downloadUrl string, filename string, expectedSha256 string) error {
+	// 文件名白名单：拒绝含路径分隔符或特殊字符的文件名，防止命令注入
+	if !isSafeUpdateFilename(filename) {
+		return fmt.Errorf("invalid update filename: %q", filename)
+	}
+
 	resp, err := http.Get(downloadUrl)
 	if err != nil {
 		return err
@@ -381,9 +444,18 @@ func (a *App) UpdateApp(downloadUrl string, filename string) error {
 	}
 
 	pr := &downloadProgressReader{Reader: resp.Body, ctx: a.ctx, total: resp.ContentLength}
-	_, err = io.Copy(out, pr)
+	// 边下载边计算 SHA-256，用于下载完整性校验（防供应链篡改）
+	hasher := sha256.New()
+	_, err = io.Copy(io.MultiWriter(out, hasher), pr)
 	out.Close()
 	if err != nil {
+		os.Remove(targetPath)
+		return err
+	}
+
+	// 完整性校验：必须提供预期的 SHA-256，且与实际下载内容一致
+	// 校验失败直接删除文件并报错，绝不安装未经校验的二进制
+	if err := verifySha256Hex(hex.EncodeToString(hasher.Sum(nil)), expectedSha256); err != nil {
 		os.Remove(targetPath)
 		return err
 	}

@@ -260,10 +260,14 @@ export default function Terminal({ sessionId, status, isActive, serverName }) {
     // ── WebSocket 连接 & Predictive Local Echo ─────────────────────
     let ws = null;
     const pendingEchoes = [];
+    // 复用解码器 + 游标式回显队列：避免每次消息新建 TextDecoder、避免 shift() O(n)
+    // 高频 WS 帧（如 top/日志滚动）与大量粘贴输入下可显著降低匹配开销
+    const decoder = new TextDecoder();
+    let echoIdx = 0;
 
-    AppGo.GetWsPort().then((port) => {
-      if (!port || !termRef.current) return;
-      ws = new WebSocket(`ws://127.0.0.1:${port}/ws/${sessionId}`);
+    AppGo.GetWsConnectionInfo().then((info) => {
+      if (!info?.port || !info?.token || !termRef.current) return;
+      ws = new WebSocket(`ws://127.0.0.1:${info.port}/ws/${sessionId}?token=${encodeURIComponent(info.token)}`);
       ws.binaryType = 'arraybuffer';
       wsRef.current = ws;
 
@@ -272,14 +276,14 @@ export default function Terminal({ sessionId, status, isActive, serverName }) {
       ws.onmessage = (ev) => {
         if (!termRef.current) return;
 
-        // 如果没有正在预测的字符，直接使用原生 Uint8Array 交给 xterm.js 渲染（最快且无损，避免 TextDecoder 吃字符）
-        if (localStorage.getItem('terminalLocalEcho') === 'false' || pendingEchoes.length === 0) {
+        // 没有待匹配的预测字符时，直接使用原生 Uint8Array 交给 xterm.js 渲染（最快且无损，避免 TextDecoder 吃字符）
+        if (localStorage.getItem('terminalLocalEcho') === 'false' || echoIdx === pendingEchoes.length) {
           termRef.current.write(typeof ev.data === 'string' ? ev.data : new Uint8Array(ev.data));
           return;
         }
 
         // --- 预测匹配阶段 ---
-        let text = typeof ev.data === 'string' ? ev.data : new TextDecoder().decode(ev.data);
+        let text = typeof ev.data === 'string' ? ev.data : decoder.decode(ev.data);
         let i = 0;
         let newText = '';
         
@@ -313,16 +317,16 @@ export default function Terminal({ sessionId, status, isActive, serverName }) {
             continue;
           }
 
-          // 2. 匹配回显字符并丢弃
-          if (pendingEchoes.length > 0) {
-            const expected = pendingEchoes[0];
-            if (text[i] === expected) {
-              pendingEchoes.shift();
-              i++;
-              continue;
-            }
-            if (expected === '\x7F' && text[i] === '\b') {
-              pendingEchoes.shift();
+          // 2. 匹配回显字符并丢弃（游标 O(1)，替代 shift() O(n)，大量粘贴/高频输出不卡顿）
+          if (echoIdx < pendingEchoes.length) {
+            const expected = pendingEchoes[echoIdx];
+            if (text[i] === expected || (expected === '\x7F' && text[i] === '\b')) {
+              echoIdx++;
+              // 全部匹配完成：清空队列并复位游标，供下一轮输入复用
+              if (echoIdx === pendingEchoes.length) {
+                pendingEchoes.length = 0;
+                echoIdx = 0;
+              }
               i++;
               continue;
             }
@@ -337,6 +341,7 @@ export default function Terminal({ sessionId, status, isActive, serverName }) {
           
           // 真正的冲突（服务器发来了与预测不符的可打印字符），视为脱轨，清空队列并接受服务器输出
           pendingEchoes.length = 0;
+          echoIdx = 0;
           newText += text[i];
           i++;
         }
@@ -668,12 +673,14 @@ export default function Terminal({ sessionId, status, isActive, serverName }) {
                 transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => {
-                e.target.style.background = 'var(--green-dim)';
-                e.target.style.borderColor = 'var(--green-glow)';
+                e.target.style.background = 'var(--green)';
+                e.target.style.borderColor = 'var(--green)';
+                e.target.style.color = '#fff';
               }}
               onMouseLeave={(e) => {
                 e.target.style.background = 'var(--green-dim)';
                 e.target.style.borderColor = 'var(--green-glow)';
+                e.target.style.color = 'var(--green)';
               }}
             >
               重新连接

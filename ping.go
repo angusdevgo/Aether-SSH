@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -39,10 +40,13 @@ func isLocalOrPrivateIP(host string) bool {
 //
 // In both cases we pick whichever sub-interval best represents the true RTT.
 func measureLatency(host string, port int) (int64, bool) {
-	target := fmt.Sprintf("%s:%d", host, port)
+	// 使用 net.JoinHostPort 兼容 IPv6（[::1]:22 形式），同时兼容 IPv4
+	target := net.JoinHostPort(host, strconv.Itoa(port))
 
 	start := time.Now()
-	conn, err := net.DialTimeout("tcp", target, 4*time.Second)
+	// 快速失败：不可达服务器（防火墙 drop/宕机）在 1.5s 内返回，
+	// 避免每次 ping 挂起数秒并持续堆积 TCP 连接尝试，污染本地网络栈
+	conn, err := net.DialTimeout("tcp", target, 1500*time.Millisecond)
 	if err != nil {
 		return 0, false
 	}
@@ -51,7 +55,7 @@ func measureLatency(host string, port int) (int64, bool) {
 	defer conn.Close()
 
 	// Try to read the SSH banner — the server sends it immediately after TCP connect.
-	conn.SetDeadline(time.Now().Add(3 * time.Second))
+	conn.SetDeadline(time.Now().Add(1500 * time.Millisecond))
 	buf := make([]byte, 64)
 	n, err := conn.Read(buf)
 	bannerMs := time.Since(connectedAt).Milliseconds()
@@ -80,7 +84,9 @@ func measureLatency(host string, port int) (int64, bool) {
 
 // PingServer returns the latency to the SSH port.
 func PingServer(host string, port int) map[string]interface{} {
-	const samples = 2
+	// 降为 1 个采样：延迟展示无需双采样精确值，
+	// 单次即可显著减少不可达服务器（快速失败）的资源占用
+	const samples = 1
 	var best int64 = -1
 	var anyOnline bool
 

@@ -61,19 +61,17 @@ export function useSessions(addToast, onConnected) {
   }, [addToast, onConnected]);
 
   const closeSession = useCallback(async (sessionId, e) => {
-    e?.stopPropagation();
+    e?.stopPropagation?.();
     try { await AppGo.DisconnectSSH(sessionId); } catch (_) {}
-    setSessions(prev => prev.filter(s => s.id !== sessionId));
-    // 如果关闭的是当前激活的，切换到剩余最后一个
-    setActiveSessionId(prev => {
-      setSessions(cur => {
-        const remaining = cur.filter(s => s.id !== sessionId);
-        if (prev === sessionId) {
-          setTimeout(() => setActiveSessionId(remaining.length > 0 ? remaining[remaining.length - 1].id : null), 0);
+    setSessions(prev => {
+      const remaining = prev.filter(s => s.id !== sessionId);
+      setActiveSessionId(activeId => {
+        if (activeId === sessionId) {
+          return remaining.length > 0 ? remaining[remaining.length - 1].id : null;
         }
-        return cur; // 已经 filter 过了
+        return activeId;
       });
-      return prev;
+      return remaining;
     });
   }, []);
 

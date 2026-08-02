@@ -24,7 +24,7 @@ export function GetTerminalCwd(arg1:string):Promise<string>;
 
 export function GetWebdavConfig():Promise<Record<string, string>>;
 
-export function GetWsPort():Promise<number>;
+export function GetWsConnectionInfo():Promise<Record<string, any>>;
 
 export function IsPortableVersion():Promise<boolean>;
 
@@ -62,7 +62,7 @@ export function TestWebdavConnection(arg1:string,arg2:string,arg3:string):Promis
 
 export function UncompressItem(arg1:string,arg2:string):Promise<void>;
 
-export function UpdateApp(arg1:string,arg2:string):Promise<void>;
+export function UpdateApp(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function UploadFile(arg1:string,arg2:string):Promise<void>;
 
