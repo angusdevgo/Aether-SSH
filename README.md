@@ -44,15 +44,7 @@ Aether 不仅仅是一个 SSH 客户端，它是一套为了消除繁杂运维�
   - 无论您如何调整底部分屏、切换侧边栏，终端行列都能实现**零裁剪、零遮挡**的完美重绘。
 - ☁️ **全时无缝 WebDAV 漫游**
   - 内置企业级 WebDAV 增量同步模块，每一次连接和配置修改都会生成高强度加密快照。多端登录，一键全自动恢复。
-- 📱 **多终端跨平台拓展 (Android)**
-  - 基于同一套现代设计语言，正在构建无缝接驳的移动生态，随时随地保持核心连接。
 
-<div align="center">
-  <br/>
-  <img src="assets/android_quick_connect.jpg" alt="Aether Android Preview" width="300" />
-</div>
-
----
 
 ## 🔒 本地高强度加密与无缝恢复
 
