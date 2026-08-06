@@ -60,19 +60,19 @@ export default function QuickCommands({ sessionId, addToast, onClose }) {
       {adding && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 12, background: 'var(--bg-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
           <input
+            className="input"
             placeholder="名称（如：重启 Nginx）"
             value={label}
             onChange={e => setLabel(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-1)', fontSize: 13, outline: 'none' }}
             autoFocus
           />
           <textarea
+            className="input"
             placeholder="命令（如：systemctl restart nginx）"
             value={cmd}
             onChange={e => setCmd(e.target.value)}
             rows={2}
-            style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-0)', color: 'var(--text-1)', fontSize: 13, fontFamily: 'var(--font-mono)', outline: 'none', resize: 'vertical' }}
           />
           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
             <button className="btn btn-secondary btn-sm" onClick={() => { setAdding(false); setEditingId(null); setLabel(''); setCmd(''); }}>取消</button>
@@ -103,7 +103,7 @@ export default function QuickCommands({ sessionId, addToast, onClose }) {
               style={{ padding: '4px 12px', fontSize: 12, flexShrink: 0 }}
             >▶ 发送</button>
             <button className="btn btn-ghost btn-sm" onClick={() => handleEdit(c)} style={{ fontSize: 12, flexShrink: 0, padding: '4px 8px', color: 'var(--text-4)' }}>✏️</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(c.id)} style={{ fontSize: 12, flexShrink: 0, padding: '4px 8px', color: '#ef4444' }}>🗑</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(c.id)} style={{ fontSize: 12, flexShrink: 0, padding: '4px 8px', color: 'var(--red)' }}>🗑</button>
           </div>
         ))}
       </div>

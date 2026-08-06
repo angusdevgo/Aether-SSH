@@ -3,6 +3,7 @@ import * as AppGo from '../../wailsjs/go/main/App.js';
 import { setLanguage as setGlobalLanguage } from '../i18n.js';
 import logoImg from '../assets/logo.png';
 import { APP_VERSION } from '../config.js';
+import { applyThemePreset, applyCustomAccent, THEME_PRESETS } from '../theme.js';
 
 const I18N = {
   'zh-CN': {
@@ -48,6 +49,9 @@ const I18N = {
       themeLight: '☀️ 浅色',
       themeSys: '💻 系统',
       themeDark: '🌙 深色',
+      presetTitle: '风格预设',
+      presetLabel: '主色调风格',
+      presetDesc: '一键切换整套主色调（按钮、高亮、强调色）',
       accentTitle: '强调色',
       accentLabel: '使用自定义强调色',
       accentDesc: '覆盖主题自带的强调色',
@@ -102,6 +106,9 @@ const I18N = {
       themeLight: '☀️ Light',
       themeSys: '💻 System',
       themeDark: '🌙 Dark',
+      presetTitle: 'Style Preset',
+      presetLabel: 'Accent Style',
+      presetDesc: 'Switch the whole accent palette (buttons, highlights)',
       accentTitle: 'Accent Color',
       accentLabel: 'Use Custom Accent',
       accentDesc: 'Override default accent color',
@@ -271,6 +278,7 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
   const [themeMode, setThemeMode] = useState(localStorage.getItem('themeMode') || 'dark');
   const [themeAccent, setThemeAccent] = useState(localStorage.getItem('themeAccent') || '#64748b');
   const [useCustomAccent, setUseCustomAccent] = useState(localStorage.getItem('useCustomAccent') === 'true');
+  const [themePreset, setThemePreset] = useState(localStorage.getItem('themePreset') || 'default');
   const [language, setLanguage] = useState(localStorage.getItem('appLanguage') || 'zh-CN');
   const [appFont, setAppFont] = useState(localStorage.getItem('appFont') || 'system-ui');
   const [terminalFontSize, setTerminalFontSize] = useState(parseInt(localStorage.getItem('terminalFontSize') || '13', 10));
@@ -351,7 +359,7 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
     setThemeAccent(color);
     localStorage.setItem('themeAccent', color);
     if (useCustomAccent) {
-      document.documentElement.style.setProperty('--green', color);
+      applyCustomAccent(color);
     }
   };
 
@@ -368,11 +376,21 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
     setUseCustomAccent(nextVal);
     localStorage.setItem('useCustomAccent', String(nextVal));
     if (nextVal) {
-      document.documentElement.style.setProperty('--green', themeAccent);
+      applyCustomAccent(themeAccent);
     } else {
-      document.documentElement.style.setProperty('--green', '#64748b');
+      // 关闭自定义强调色 → 恢复到当前风格预设（默认即霓虹绿）
+      applyThemePreset(themePreset);
     }
     addToast(nextVal ? '已启用自定义强调色' : '已恢复默认强调色', 'success');
+  };
+
+  const handlePresetChange = (presetId) => {
+    setThemePreset(presetId);
+    localStorage.setItem('themePreset', presetId);
+    // 预设与自定义强调色互斥：选择预设即关闭自定义强调色
+    setUseCustomAccent(false);
+    localStorage.setItem('useCustomAccent', 'false');
+    applyThemePreset(presetId);
   };
 
   const handleLanguageChange = (e) => {
@@ -949,6 +967,33 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
                         <button className={`btn btn-sm ${themeMode === 'system' ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => handleThemeChange('system')} style={{ borderRadius: 'var(--radius-xl)', background: themeMode === 'system' ? 'var(--bg-3)' : 'transparent' }}>{t.appearance.themeSys}</button>
                         <button className={`btn btn-sm ${themeMode === 'dark' ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => handleThemeChange('dark')} style={{ borderRadius: 'var(--radius-xl)', background: themeMode === 'dark' ? 'var(--bg-3)' : 'transparent' }}>{t.appearance.themeDark}</button>
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 style={{ fontSize: 14, color: 'var(--text-1)', marginBottom: 12, fontWeight: 600 }}>{t.appearance.presetTitle}</h3>
+                  <div className="form-group" style={{ background: 'var(--bg-2)', padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ color: 'var(--text-1)', fontSize: 13 }}>{t.appearance.presetLabel}</div>
+                      <div style={{ color: 'var(--text-4)', fontSize: 11 }}>{t.appearance.presetDesc}</div>
+                    </div>
+                    <div className="theme-palette-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                      {THEME_PRESETS.map((p) => {
+                        const active = themePreset === p.id && !useCustomAccent;
+                        return (
+                          <div
+                            key={p.id}
+                            className={`theme-palette-card${active ? ' active' : ''}`}
+                            onClick={() => handlePresetChange(p.id)}
+                          >
+                            <div className="theme-palette-swatches">
+                              <span className="theme-palette-swatch" style={{ background: p.color, width: 20, height: 20 }} />
+                            </div>
+                            <div className="theme-palette-name">{language === 'en-US' ? p.nameEn : p.name}</div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

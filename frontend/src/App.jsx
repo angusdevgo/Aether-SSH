@@ -17,6 +17,7 @@ import GlobalContextMenu from './components/GlobalContextMenu.jsx';
 import { clampPanelWidth } from './components/probeFormatting.js';
 import { useTranslation } from './i18n.js';
 import { APP_VERSION } from './config.js';
+import { applyStoredTheme } from './theme.js';
 import { Settings, House, Key, Minus, Square, X, RefreshCw, Wifi, Monitor, Eye, EyeOff, LayoutGrid, List, Plus, Terminal as TerminalIcon, Folder, History, Zap, Plug, Layout } from 'lucide-react';
 
 import logoImg from './assets/logo.png';
@@ -62,6 +63,9 @@ export default function App() {
   const leftSplitWidthRef = useRef(leftSplitWidth);
   const bottomSplitHeightRef = useRef(bottomSplitHeight);
   const probePanelWidthRef = useRef(probePanelWidth);
+
+  // 顶部会话标签的 DOM 引用，用于把活动标签滚动到可视区
+  const tabItemRefs = useRef({});
 
   const updateLeftSplitWidth = (w) => {
     setLeftSplitWidth(w);
@@ -163,20 +167,9 @@ export default function App() {
   const [showQuickPass, setShowQuickPass] = useState(false);
   const [showQuickPassphrase, setShowQuickPassphrase] = useState(false);
 
-  // ── 初始化全局主题 ──────────────────────────────────────
+  // ── 初始化全局主题（暗/浅色 + 风格预设 / 自定义强调色）──
   useEffect(() => {
-    const savedTheme = localStorage.getItem('themeMode') || 'dark';
-    if (savedTheme === 'light') {
-      document.body.classList.add('theme-light');
-    } else {
-      document.body.classList.remove('theme-light');
-    }
-
-    const useCustomAccent = localStorage.getItem('useCustomAccent') === 'true';
-    const themeAccent = localStorage.getItem('themeAccent');
-    if (useCustomAccent && themeAccent) {
-      document.documentElement.style.setProperty('--green', themeAccent);
-    }
+    applyStoredTheme();
   }, []);
 
   // ── 自动检测更新机制 ────────────────────────────────────
@@ -437,6 +430,15 @@ export default function App() {
     connectServer, reconnectSession, closeSession,
   } = useSessions(addToast, handleConnected);
 
+  // ── 活动标签自动滚入视野（标签很多时不再"找不到当前标签"）──
+  // 注意：必须放在 useSessions() 解构之后，否则 activeSessionId 尚未初始化（TDZ）。
+  useEffect(() => {
+    const el = activeSessionId && tabItemRefs.current[activeSessionId];
+    if (el) {
+      el.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    }
+  }, [activeSessionId, sessions.length]);
+
   // 包装 connectServer 以处理 contentTab 和 recentServers
   const connectServerWrapped = useCallback(async (server) => {
     setContentTab('terminal');
@@ -646,21 +648,21 @@ export default function App() {
               {sessions.map((s) => (
                 <div
                   key={s.id}
+                  ref={(el) => { if (el) tabItemRefs.current[s.id] = el; else delete tabItemRefs.current[s.id]; }}
                   className={`tab-item no-drag ${activeSessionId === s.id ? 'active' : ''}`}
                   onClick={() => setActiveSessionId(s.id)}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     setTabMenu({ sessionId: s.id, x: e.clientX, y: e.clientY });
                   }}
-                  style={{ height: '28px', minHeight: '28px', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
-                  <span style={{ fontSize: '10px', display: 'inline-block', lineHeight: 1 }}>
+                  <span className="tab-status-dot" aria-hidden="true">
                     {s.status === 'connecting' ? '🟡' :
                      s.status === 'connected'  ? '🟢' :
                      s.status === 'error'      ? '🔴' :
                      s.status === 'closed'     ? '🔴' : '⚫'}
                   </span>
-                  <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  <span className="tab-label"
                     onDoubleClick={(e) => {
                       e.stopPropagation();
                       setRenamingTab(s.id);
@@ -669,6 +671,7 @@ export default function App() {
                   >
                     {renamingTab === s.id ? (
                       <input
+                        className="rename-input no-drag"
                         autoFocus
                         value={renameValue}
                         onChange={(e) => setRenameValue(e.target.value)}
@@ -683,35 +686,21 @@ export default function App() {
                           if (e.key === 'Escape') { setRenamingTab(null); }
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        style={{ width: 100, background: 'var(--bg-2)', border: '1px solid var(--border-focus)', borderRadius: 3, color: 'var(--text-1)', fontSize: 12, padding: '1px 4px', outline: 'none' }}
                       />
                     ) : (
                       s.serverName
                     )}
                   </span>
-                  {(s.status === 'closed' || s.status === 'error') && (
-                    <span
-                      className="tab-reconnect no-drag"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        reconnectSession(s);
-                      }}
-                      title="重新连接"
-                      style={{
-                        cursor: 'pointer',
-                        opacity: 0.6,
-                        marginLeft: '2px',
-                        marginRight: '2px',
-                        fontSize: '12px',
-                        transition: 'opacity 0.2s',
-                        userSelect: 'none'
-                      }}
-                      onMouseEnter={(e) => e.target.style.opacity = 1}
-                      onMouseLeave={(e) => e.target.style.opacity = 0.6}
-                    >
-                      ⟳
-                    </span>
-                  )}
+                  <span
+                    className={`tab-reconnect no-drag ${(s.status === 'closed' || s.status === 'error') ? '' : 'is-hidden'}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (s.status === 'closed' || s.status === 'error') reconnectSession(s);
+                    }}
+                    title="重新连接"
+                  >
+                    <RefreshCw size={12} />
+                  </span>
                   <span
                     className="tab-close no-drag"
                     onClick={(e) => {
@@ -944,7 +933,6 @@ export default function App() {
                     <span style={{ fontSize: 11.5, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{t('文件管理器布局')}:</span>
                     <select
                       className="select-compact"
-                      style={{ padding: '0 8px', fontSize: 11.5, height: 26, borderRadius: 5 }}
                       value={fileManagerPosition}
                       onChange={(e) => {
                         const val = e.target.value;
@@ -1227,184 +1215,6 @@ export default function App() {
                 background: 'linear-gradient(135deg,#ef4444,#dc2626)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}><Monitor size={22} style={{ color: '#fff' }} /></div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#f0f6fc', marginBottom: 3 }}>
-                  {connectingServer.server.name || connectingServer.server.host}
-                </div>
-                <div style={{ fontSize: 12, color: '#3fb950', fontFamily: 'monospace' }}>
-                  SSH {connectingServer.server.host}:{connectingServer.server.port || 22}
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                <button
-                  style={{
-                    padding: '5px 14px', fontSize: 12, borderRadius: 8, cursor: 'pointer',
-                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-                    color: '#8b949e',
-                  }}
-                  onClick={() => setConnectingServer(null)}
-                >
-                  取消
-                </button>
-              </div>
-            </div>
-
-            {/* 双进度条（参考图一）*/}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              {/* 左进度点 */}
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--green)', flexShrink: 0, boxShadow: '0 0 8px var(--green)' }} />
-              {/* 进度条 */}
-              <div style={{ flex: 1, height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%', borderRadius: 4,
-                  background: 'linear-gradient(90deg, var(--green), #86efac)',
-                  animation: 'ssh-progress-indeterminate 1.4s ease-in-out infinite',
-                }} />
-              </div>
-              {/* WiFi 图标 */}
-              <div style={{ flexShrink: 0, fontSize: 14, color: 'var(--green)' }}>📡</div>
-              {/* 第二段进度条 */}
-              <div style={{ flex: 1, height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%', borderRadius: 4,
-                  background: 'linear-gradient(90deg, var(--green), #86efac)',
-                  animation: 'ssh-progress-indeterminate 1.4s ease-in-out 0.4s infinite',
-                }} />
-              </div>
-              {/* 右旋转图标 */}
-              <div style={{ flexShrink: 0, animation: 'spin 1.2s linear infinite', fontSize: 14, color: '#6e7681' }}>⟳</div>
-            </div>
-
-            {/* 提示文字 */}
-            <div style={{ fontSize: 12, color: '#6e7681', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ animation: 'spin 1.5s linear infinite', display: 'inline-block' }}>⟳</span>
-              正在建立 SSH 连接，请稍候...
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── 托盘弹窗面板（参考图二/图三）─────────────────── */}
-      {showTrayPanel && (
-        <div
-          style={{
-            position: 'fixed', bottom: 48, right: 16, zIndex: 8000,
-            width: 280,
-            borderRadius: 14,
-            background: 'rgba(13,17,23,0.97)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            boxShadow: '0 16px 48px rgba(0,0,0,0.7)',
-            overflow: 'hidden',
-            display: 'flex', flexDirection: 'column',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* 标题栏 */}
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '14px 16px 12px',
-            borderBottom: '1px solid rgba(255,255,255,0.07)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <img src={logoImg} alt="logo" style={{ width: 24, height: 24, borderRadius: 6 }} />
-              <span style={{ fontSize: 14, fontWeight: 700, color: '#f0f6fc' }}>Aether</span>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6e7681', fontSize: 14, padding: '2px 6px' }}
-                title="展开窗口"
-                onClick={() => { import('../wailsjs/runtime/runtime.js').then(r => r.WindowShow()); setShowTrayPanel(false); }}
-              >⤢</button>
-              <button
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6e7681', fontSize: 14, padding: '2px 6px' }}
-                onClick={() => setShowTrayPanel(false)}
-              >✕</button>
-            </div>
-          </div>
-
-          {/* 内容区 */}
-          <div style={{ flex: 1, padding: '12px 0', minHeight: 120 }}>
-            {sessions.filter(s => s.status === 'connected').length > 0 ? (
-              <>
-                <div style={{ fontSize: 11, color: '#6e7681', padding: '0 16px 8px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: 1 }}>会话</div>
-                {sessions.filter(s => s.status === 'connected').map(s => (
-                  <div key={s.id} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '10px 16px', cursor: 'pointer',
-                    transition: 'background 0.15s',
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    onClick={() => {
-                      import('../wailsjs/runtime/runtime.js').then(r => r.WindowShow());
-                      setActiveSessionId(s.id);
-                      setShowTrayPanel(false);
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 6px var(--green)' }} />
-                      <span style={{ fontSize: 14, color: '#f0f6fc', fontWeight: 500 }}>{s.serverName}</span>
-                    </div>
-                    <span style={{ fontSize: 12, color: '#6e7681' }}>已连接</span>
-                  </div>
-                ))}
-              </>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '28px 16px', gap: 10 }}>
-                <div style={{ fontSize: 40 }}>😤</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#f0f6fc' }}>一切都很安静</div>
-                <div style={{ fontSize: 12, color: '#6e7681', textAlign: 'center', lineHeight: 1.6 }}>
-                  去连接个服务器吧，已经想念你了 🌿
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 底部退出按钮 */}
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '10px 16px' }}>
-            <button
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                width: '100%', background: 'none', border: 'none',
-                cursor: 'pointer', color: '#6e7681', fontSize: 13,
-                padding: '6px 0', transition: 'color 0.15s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.color = '#f0f6fc'}
-              onMouseLeave={e => e.currentTarget.style.color = '#6e7681'}
-              onClick={Quit}
-            >
-              <span>⏻</span> 退出 Aether
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Toasts ────────────────────────────────────────── */}
-      <Toast toasts={toasts} />
-      <GlobalDialog />
-
-      {/* ── 连接进度卡片 Overlay（参考图一）──────────────── */}
-      {connectingServer && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-        }}>
-          <div style={{
-            width: 380, borderRadius: 16, overflow: 'hidden',
-            background: 'rgba(22,27,34,0.97)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
-            padding: '20px 24px 22px',
-          }}>
-            {/* 标题行：图标 + 名称 + 按钮 */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 18 }}>
-              <div style={{
-                width: 42, height: 42, borderRadius: 10, flexShrink: 0,
-                background: 'linear-gradient(135deg,#ef4444,#dc2626)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 22,
-              }}>🖥</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#f0f6fc', marginBottom: 3 }}>
                   {connectingServer.server.name || connectingServer.server.host}
