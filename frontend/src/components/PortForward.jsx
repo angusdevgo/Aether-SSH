@@ -53,11 +53,11 @@ export default function PortForward({ sessionId, addToast }) {
       {adding && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, padding: 12, background: 'var(--bg-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input placeholder="本地端口 (0=自动)" value={localPort} onChange={e => setLocalPort(e.target.value)} style={inputStyle} />
+            <input className="input-compact" placeholder="本地端口 (0=自动)" value={localPort} onChange={e => setLocalPort(e.target.value)} style={{ flex: 1 }} />
             <span style={{ color: 'var(--text-4)', fontSize: 14 }}>→</span>
-            <input placeholder="远程主机" value={remoteHost} onChange={e => setRemoteHost(e.target.value)} style={inputStyle} />
+            <input className="input-compact" placeholder="远程主机" value={remoteHost} onChange={e => setRemoteHost(e.target.value)} style={{ flex: 1 }} />
             <span style={{ color: 'var(--text-4)' }}>:</span>
-            <input placeholder="远程端口" value={remotePort} onChange={e => setRemotePort(e.target.value)} style={{ ...inputStyle, width: 80 }} />
+            <input className="input-compact" placeholder="远程端口" value={remotePort} onChange={e => setRemotePort(e.target.value)} style={{ width: 90, flexShrink: 0 }} />
           </div>
           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
             <button className="btn btn-secondary btn-sm" onClick={() => setAdding(false)}>取消</button>
@@ -80,16 +80,10 @@ export default function PortForward({ sessionId, addToast }) {
             <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-1)', fontWeight: 600 }}>127.0.0.1:{f.localPort}</span>
             <span style={{ color: 'var(--text-4)' }}>→</span>
             <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-4)', flex: 1 }}>{f.remoteHost}:{f.remotePort}</span>
-            <button className="btn btn-ghost btn-sm" onClick={() => handleStop(f.localPort)} style={{ fontSize: 11, color: '#ef4444' }}>停止</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => handleStop(f.localPort)} style={{ fontSize: 11, color: 'var(--red)' }}>停止</button>
           </div>
         ))}
       </div>
     </div>
   );
 }
-
-const inputStyle = {
-  padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)',
-  background: 'var(--bg-0)', color: 'var(--text-1)', fontSize: 12,
-  fontFamily: 'var(--font-mono)', outline: 'none', flex: 1,
-};

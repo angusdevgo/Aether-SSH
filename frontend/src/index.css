@@ -22,6 +22,11 @@
   --border: rgba(255, 255, 255, 0.06);
   --border-light: rgba(255, 255, 255, 0.03);
   --border-focus: rgba(59, 130, 246, 0.5);
+  /* 输入框专用：比 --border 更可见，避免输入框"消失"在背景里 */
+  --input-border: rgba(255, 255, 255, 0.14);
+  --input-border-hover: rgba(255, 255, 255, 0.22);
+  --input-bg: #0d0e16;
+  --input-bg-focus: var(--bg-1);
 
   /* Text */
   --text-1: #f8fafc;
@@ -49,6 +54,8 @@
   /* Primary Gradient */
   --primary-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
   --primary-hover: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  --primary-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+  --primary-shadow-hover: 0 6px 16px rgba(16, 185, 129, 0.35);
 
   /* Shadows */
   --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -95,6 +102,10 @@ body.theme-light {
   --border: rgba(15, 23, 42, 0.08);
   --border-light: rgba(15, 23, 42, 0.04);
   --border-focus: #64748b;
+  --input-border: rgba(15, 23, 42, 0.20);
+  --input-border-hover: rgba(15, 23, 42, 0.32);
+  --input-bg: #ffffff;
+  --input-bg-focus: #ffffff;
 
   /* Text */
   --text-1: #0f172a;
@@ -107,6 +118,58 @@ body.theme-light {
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
   --shadow-lg: 0 12px 24px rgba(15, 23, 42, 0.12);
   --shadow-glow-green: 0 0 20px rgba(100, 116, 139, 0.08);
+}
+
+/* ============================================================
+   风格预设 (Theme Presets)
+   通过给 <html> (documentElement) 加 .theme-preset-xxx 切换主色调。
+   default = 不加类（沿用 :root 霓虹绿）。预设与自定义强调色互斥：
+   应用预设时清除 --green 内联覆盖；应用自定义强调色时清除预设类。
+   ============================================================ */
+:root.theme-preset-ocean {
+  --green: #3b82f6;
+  --green-dim: rgba(59, 130, 246, 0.15);
+  --green-glow: 0 0 16px rgba(59, 130, 246, 0.3);
+  --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  --primary-hover: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  --primary-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+  --primary-shadow-hover: 0 6px 16px rgba(59, 130, 246, 0.35);
+}
+:root.theme-preset-violet {
+  --green: #8b5cf6;
+  --green-dim: rgba(139, 92, 246, 0.15);
+  --green-glow: 0 0 16px rgba(139, 92, 246, 0.3);
+  --primary-gradient: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  --primary-hover: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+  --primary-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+  --primary-shadow-hover: 0 6px 16px rgba(139, 92, 246, 0.35);
+}
+:root.theme-preset-amber {
+  --green: #f59e0b;
+  --green-dim: rgba(245, 158, 11, 0.15);
+  --green-glow: 0 0 16px rgba(245, 158, 11, 0.3);
+  --primary-gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  --primary-hover: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  --primary-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+  --primary-shadow-hover: 0 6px 16px rgba(245, 158, 11, 0.35);
+}
+:root.theme-preset-rose {
+  --green: #f43f5e;
+  --green-dim: rgba(244, 63, 94, 0.15);
+  --green-glow: 0 0 16px rgba(244, 63, 94, 0.3);
+  --primary-gradient: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+  --primary-hover: linear-gradient(135deg, #fb7185 0%, #f43f5e 100%);
+  --primary-shadow: 0 4px 12px rgba(244, 63, 94, 0.25);
+  --primary-shadow-hover: 0 6px 16px rgba(244, 63, 94, 0.35);
+}
+:root.theme-preset-cyan {
+  --green: #06b6d4;
+  --green-dim: rgba(6, 182, 212, 0.15);
+  --green-glow: 0 0 16px rgba(6, 182, 212, 0.3);
+  --primary-gradient: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+  --primary-hover: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
+  --primary-shadow: 0 4px 12px rgba(6, 182, 212, 0.25);
+  --primary-shadow-hover: 0 6px 16px rgba(6, 182, 212, 0.35);
 }
 
 /* ── Reset ──────────────────────────────────────────────────── */
@@ -169,12 +232,12 @@ a { color: var(--blue); text-decoration: none; }
 .btn-primary {
   background: var(--primary-gradient);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+  box-shadow: var(--primary-shadow);
   border: 1px solid rgba(255,255,255,0.1);
 }
 .btn-primary:hover {
   background: var(--primary-hover);
-  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+  box-shadow: var(--primary-shadow-hover);
   transform: translateY(-1px);
 }
 .btn-primary:active { transform: translateY(1px); }
@@ -232,21 +295,61 @@ a { color: var(--blue); text-decoration: none; }
 
 .input {
   width: 100%;
-  background: var(--bg-0);
-  border: 1px solid var(--border);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   color: var(--text-1);
-  padding: 8px 12px;
+  padding: 9px 12px;
   border-radius: var(--radius-sm);
   font-size: 13px;
-  transition: var(--transition);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
+.input::placeholder { color: var(--text-4); }
+.input:hover { border-color: var(--input-border-hover); }
 .input:focus {
   outline: none;
   border-color: var(--blue);
-  box-shadow: 0 0 0 2px var(--blue-dim);
-  background: var(--bg-1);
+  box-shadow: 0 0 0 3px var(--blue-dim);
+  background: var(--input-bg-focus);
 }
 .input:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* textarea 共用 .input，但允许纵向缩放与等宽字体 */
+textarea.input {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* 下拉框：原生 <select> 不再有浏览器默认丑样 */
+.select {
+  width: 100%;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-1);
+  padding: 9px 30px 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.select:hover { border-color: var(--input-border-hover); }
+.select:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-dim);
+}
+.select:disabled { opacity: 0.6; cursor: not-allowed; }
+/* 浅色主题下拉箭头颜色保持可读 */
+body.theme-light .select option { color: #0f172a; }
 
 .form-group {
   display: flex;
@@ -358,8 +461,9 @@ a { color: var(--blue); text-decoration: none; }
   cursor: pointer !important;
   user-select: none !important;
   -webkit-user-select: none !important;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   --wails-draggable: no-drag;
+  flex-shrink: 0; /* 标签不被压缩：多了就横向滚动，宽度稳定不抖动 */
 }
 
 .tab-item:hover {
@@ -374,6 +478,28 @@ a { color: var(--blue); text-decoration: none; }
   border-color: var(--border-focus);
   font-weight: 500;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.tab-status-dot {
+  font-size: 10px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.tab-label {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+}
+.tab-label .rename-input {
+  width: 110px;
+  font-size: 12px;
+  padding: 1px 6px;
 }
 
 .tab-close {
@@ -416,6 +542,13 @@ a { color: var(--blue); text-decoration: none; }
 .tab-reconnect:hover {
   background: var(--bg-3);
   color: #fff;
+}
+
+/* 预留重连槽位：断开/报错时显示 ⟳，其它状态隐藏但占位，
+   避免状态翻转导致标签宽度变化、相邻标签左右滑动 */
+.tab-reconnect.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .topbar-tab {
@@ -1573,20 +1706,38 @@ a { color: var(--blue); text-decoration: none; }
 
 .input-compact, .select-compact, .textarea-compact {
   width: 100%;
-  background: var(--bg-3);
-  border: 1px solid var(--border);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: var(--radius-sm);
-  padding: 6px 10px;
+  padding: 7px 10px;
   color: var(--text-1);
   font-size: 12px;
-  transition: var(--transition);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
+
+.input-compact::placeholder, .textarea-compact::placeholder { color: var(--text-4); }
+.input-compact:hover, .select-compact:hover, .textarea-compact:hover { border-color: var(--input-border-hover); }
 
 .input-compact:focus, .select-compact:focus, .textarea-compact:focus {
   outline: none;
-  border-color: var(--border-focus);
-  background: var(--bg-4);
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-dim);
+  background: var(--input-bg-focus);
 }
+
+/* compact 下拉框同样去掉原生样式并加箭头 */
+.select-compact {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  padding-right: 26px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 10px;
+}
+body.theme-light .select-compact option { color: #0f172a; }
 
 .textarea-compact {
   height: 60px;

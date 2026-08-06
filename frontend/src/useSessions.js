@@ -64,12 +64,15 @@ export function useSessions(addToast, onConnected) {
     e?.stopPropagation?.();
     try { await AppGo.DisconnectSSH(sessionId); } catch (_) {}
     setSessions(prev => {
+      // 先在被关标签的原始位置定位索引，以便把焦点交给「相邻」标签（与浏览器/终端一致）
+      const idx = prev.findIndex(s => s.id === sessionId);
       const remaining = prev.filter(s => s.id !== sessionId);
       setActiveSessionId(activeId => {
-        if (activeId === sessionId) {
-          return remaining.length > 0 ? remaining[remaining.length - 1].id : null;
-        }
-        return activeId;
+        if (activeId !== sessionId) return activeId;
+        if (remaining.length === 0) return null;
+        // 优先跳到被关标签左边的标签；若关的是第一个，则跳到右边那个
+        const neighborIdx = Math.max(0, idx - 1);
+        return remaining[Math.min(neighborIdx, remaining.length - 1)].id;
       });
       return remaining;
     });

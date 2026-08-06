@@ -83,10 +83,10 @@ function DialogContent({ current, onClose, onConfirm }) {
       </div>
       
       {current.type === 'prompt' && (
-        <input 
+        <input
           autoFocus
-          className="input" 
-          style={{ width: '100%', marginBottom: 28, textAlign: 'center', fontSize: 16, padding: '12px 16px' }}
+          className="input"
+          style={{ marginBottom: 28, textAlign: 'center' }}
           value={inputValue}
           onChange={e => setInputValue(e.target.value)}
           onKeyDown={e => {
