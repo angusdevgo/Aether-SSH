@@ -558,7 +558,7 @@ export default function SettingsModal({ onClose, addToast, onRestored, inline = 
       <div className="settings-content" style={{ flex: 1, padding: '32px 48px', overflowY: 'auto', background: 'var(--m3-surface-dim)' }}>
             
             {activeTab === 'app' && (
-              <div style={{ display: 'flex', flexDirection: 'column', padding: '16px 24px', gap: 32, maxWidth: 640 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', padding: '16px 24px', gap: 32, maxWidth: 640, width: '100%', margin: '0 auto' }}>
                 {/* 顶部布局：图标与标题 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
                   <img 
@@ -724,7 +724,7 @@ export default function SettingsModal({ onClose, addToast, onRestored, inline = 
             )}
 
             {activeTab === 'network' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 32, maxWidth: 680, width: '100%', margin: '0 auto' }}>
                 {/* 延迟检测协议 */}
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', marginBottom: 4 }}>{t.network.pingProtocolTitle}</div>
@@ -817,7 +817,7 @@ export default function SettingsModal({ onClose, addToast, onRestored, inline = 
               </div>
             )}
             {activeTab === 'appearance' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 680 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 680, width: '100%', margin: '0 auto' }}>
                 {/* ── 界面与显示设置 ── */}
                 <div>
                   <div className="m3-settings-section-title">🎨 {t.appearance.langTitle}</div>
@@ -1045,7 +1045,7 @@ export default function SettingsModal({ onClose, addToast, onRestored, inline = 
             )}
 
             {activeTab === 'shortcuts' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 680, width: '100%', margin: '0 auto' }}>
                 <div>
                   <h3 style={{ fontSize: 14, color: 'var(--text-1)', marginBottom: 12, fontWeight: 600 }}>终端快捷键</h3>
                   <div className="form-group" style={{ background: 'var(--bg-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
@@ -1185,7 +1185,7 @@ export default function SettingsModal({ onClose, addToast, onRestored, inline = 
             )}
 
             {activeTab === 'sync' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 600 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 600, width: '100%', margin: '0 auto' }}>
                 <div style={{ background: 'var(--bg-2)', padding: 24, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
                     <div style={{ width: 40, height: 40, borderRadius: 8, background: 'var(--bg-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>☁️</div>
