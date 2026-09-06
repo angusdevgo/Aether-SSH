@@ -70,7 +70,7 @@ export default function CommandHistory({ sessionId, addToast }) {
   const handleClear = async () => {
     if (await window.aetherDialog?.confirm(`${t('确定要清空历史指令吗？') || '确定要清空历史指令吗？'}`)) {
       setHistory([]);
-      try { localStorage.removeItem(storageKey); } catch (_) {}
+      try { localStorage.removeItem(`cmd_history_${sessionId}`); } catch (_) {}
     }
   };
 

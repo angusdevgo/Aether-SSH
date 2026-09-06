@@ -30,9 +30,27 @@ type App struct {
 	sshManager    *SSHManager
 	configManager *ConfigManager
 	wsPort        int
-	wsToken       string                        // 随机鉴权 token，防止本地恶意进程劫持终端通道
+	wsToken       string             // 随机鉴权 token，防止本地恶意进程劫持终端通道
 	wsMu          sync.Mutex
-	wsConns       map[string]*websocket.Conn // sessionId -> active WebSocket
+	wsConns       map[string]*wsConn // sessionId -> active WebSocket
+}
+
+// wsConn 包装 websocket.Conn，内部串行化写入。
+// gorilla/websocket 不允许并发写：stdout 与 stderr 两个 pump goroutine 会
+// 同时调用 WriteWsOutput，若无写锁，两路帧数据会互相穿插导致帧损坏/panic。
+type wsConn struct {
+	conn *websocket.Conn
+	mu   sync.Mutex
+}
+
+// writeBinary 串行化写入二进制帧，并设置写超时：
+// 浏览器停止读取时若无超时，WriteMessage 将无限阻塞 pump goroutine，
+// 背压传导会冻结整个终端（stdout/stderr 全部卡死）。
+func (w *wsConn) writeBinary(data []byte) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	_ = w.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+	return w.conn.WriteMessage(websocket.BinaryMessage, data)
 }
 
 // NewApp creates a new App application struct
@@ -40,7 +58,7 @@ func NewApp() *App {
 	return &App{
 		sshManager:    NewSSHManager(),
 		configManager: NewConfigManager(),
-		wsConns:       make(map[string]*websocket.Conn),
+		wsConns:       make(map[string]*wsConn),
 	}
 }
 
@@ -132,9 +150,10 @@ func (a *App) handleWS(upgrader websocket.Upgrader) http.HandlerFunc {
 		}
 		defer conn.Close()
 
-		// 注册当前 WebSocket 连接
+		// 注册当前 WebSocket 连接（包装为带写锁的写入器，防 stdout/stderr 并发写）
+		wrapped := &wsConn{conn: conn}
 		a.wsMu.Lock()
-		a.wsConns[sessionId] = conn
+		a.wsConns[sessionId] = wrapped
 		a.wsMu.Unlock()
 		defer func() {
 			a.wsMu.Lock()
@@ -143,6 +162,8 @@ func (a *App) handleWS(upgrader websocket.Upgrader) http.HandlerFunc {
 		}()
 
 		// 读取 WebSocket 消息，直通 SSH stdin
+		// 读限制：本地回环通道无需接受超大帧，防御异常客户端耗尽内存
+		conn.SetReadLimit(1 << 20)
 		for {
 			_, msg, err := conn.ReadMessage()
 			if err != nil {
@@ -159,7 +180,7 @@ func (a *App) WriteWsOutput(sessionId string, data []byte) {
 	conn, ok := a.wsConns[sessionId]
 	a.wsMu.Unlock()
 	if ok {
-		_ = conn.WriteMessage(websocket.BinaryMessage, data)
+		_ = conn.writeBinary(data)
 	}
 }
 
@@ -318,6 +339,37 @@ func (a *App) ReadPrivateKeyFile() (string, error) {
 		return "", err
 	}
 	return string(content), nil
+}
+
+// ── SSH 密钥管理（凭据页）────────────────────────────────────────
+
+// ListSSHKeys 列出密钥库中的密钥元数据（不含私钥）
+func (a *App) ListSSHKeys() []map[string]interface{} {
+	return a.configManager.ListSSHKeys()
+}
+
+// GenerateSSHKey 生成 ed25519 密钥对并加密保存
+func (a *App) GenerateSSHKey(name string) (map[string]interface{}, error) {
+	return a.configManager.GenerateSSHKey(name)
+}
+
+// ImportSSHKey 导入 PEM 私钥文件内容并加密保存
+func (a *App) ImportSSHKey(name string, privateKeyPEM string, passphrase string) (map[string]interface{}, error) {
+	return a.configManager.ImportSSHKey(name, privateKeyPEM, passphrase)
+}
+
+// DeleteSSHKey 删除密钥库中的密钥
+func (a *App) DeleteSSHKey(id string) bool {
+	return a.configManager.DeleteSSHKey(id)
+}
+
+// ExecOnConnection 对未建立会话的服务器一次性执行命令并返回输出（脚本页发送）
+func (a *App) ExecOnConnection(connId string, cmd string) (string, error) {
+	conn := a.configManager.GetConnectionByID(connId)
+	if conn == nil {
+		return "", fmt.Errorf("connection not found")
+	}
+	return a.sshManager.execOnce(*conn, cmd)
 }
 
 // ── Port Forwarding ──────────────────────────────────────────────

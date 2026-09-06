@@ -16,7 +16,7 @@ func newTestApp() *App {
 	return &App{
 		sshManager: NewSSHManager(),
 		wsToken:    testWsToken,
-		wsConns:    make(map[string]*websocket.Conn),
+		wsConns:    make(map[string]*wsConn),
 	}
 }
 
@@ -43,7 +43,7 @@ func TestCheckWsToken(t *testing.T) {
 	}
 
 	// wsToken 为空时一律拒绝
-	emptyApp := &App{wsConns: make(map[string]*websocket.Conn)}
+	emptyApp := &App{wsConns: make(map[string]*wsConn)}
 	if emptyApp.checkWsToken(testWsToken) {
 		t.Fatal("expected checkWsToken to reject when wsToken is empty")
 	}

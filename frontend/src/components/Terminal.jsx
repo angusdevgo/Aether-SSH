@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
-import { AttachAddon } from '@xterm/addon-attach';
 import { Copy, Clipboard, Trash2, CheckSquare, MoreHorizontal } from 'lucide-react';
 import * as AppGo from '../../wailsjs/go/main/App.js';
 import { reduceTerminalHistoryInput } from './terminalHistory.js';
@@ -72,6 +71,24 @@ function getXtermTheme() {
 }
 
 const PROMPT_MARKERS = ['# ', '$ ', '% ', '> '];
+
+// ── 热路径设置缓存 ────────────────────────────────────────────────
+// terminalLocalEcho 在每条 WS 消息、appShortcuts 在每次按键时被读取；
+// localStorage 同步 I/O 挂在最高频路径上开销显著，因此缓存为模块级变量，
+// 仅在 SettingsModal 派发 terminal-settings-changed 事件时刷新。
+function readHotSettings() {
+  let shortcuts = { copy: 'Ctrl+C', paste: 'Ctrl+V', clear: 'Ctrl+L', newTab: 'Ctrl+T' };
+  try {
+    const saved = localStorage.getItem('appShortcuts');
+    if (saved) shortcuts = { ...shortcuts, ...JSON.parse(saved) };
+  } catch (_) {}
+  return {
+    localEcho: localStorage.getItem('terminalLocalEcho') !== 'false',
+    shortcuts,
+  };
+}
+let hotSettings = readHotSettings();
+function refreshHotSettings() { hotSettings = readHotSettings(); }
 
 function readDisplayedCommand(term) {
   const buffer = term?.buffer?.active;
@@ -170,12 +187,8 @@ export default function Terminal({ sessionId, status, isActive, serverName }) {
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== 'keydown') return true;
 
-      // 1. 获取用户自定义的快捷键配置
-      let customShortcuts = { copy: 'Ctrl+C', paste: 'Ctrl+V', clear: 'Ctrl+L', newTab: 'Ctrl+T' };
-      try {
-        const saved = localStorage.getItem('appShortcuts');
-        if (saved) customShortcuts = JSON.parse(saved);
-      } catch (_) {}
+      // 1. 获取用户自定义的快捷键配置（热路径缓存，避免每次按键读 localStorage）
+      const customShortcuts = hotSettings.shortcuts;
 
       // 2. 解析当前按下的组合键字符串（如 "Ctrl+C", "Ctrl+Shift+V"）
       const keys = [];
@@ -277,7 +290,7 @@ export default function Terminal({ sessionId, status, isActive, serverName }) {
         if (!termRef.current) return;
 
         // 没有待匹配的预测字符时，直接使用原生 Uint8Array 交给 xterm.js 渲染（最快且无损，避免 TextDecoder 吃字符）
-        if (localStorage.getItem('terminalLocalEcho') === 'false' || echoIdx === pendingEchoes.length) {
+        if (!hotSettings.localEcho || echoIdx === pendingEchoes.length) {
           termRef.current.write(typeof ev.data === 'string' ? ev.data : new Uint8Array(ev.data));
           return;
         }
@@ -395,8 +408,8 @@ export default function Terminal({ sessionId, status, isActive, serverName }) {
         wsRef.current.send(new TextEncoder().encode(data));
       }
 
-      // Local Echo 逻辑 (恢复默认开启)
-      if (localStorage.getItem('terminalLocalEcho') !== 'false') {
+      // Local Echo 逻辑 (默认开启，读取热路径缓存)
+      if (hotSettings.localEcho) {
         // 如果输入中不包含控制字符（如方向键、Esc、退格等），则视作常规可见输入（支持多字符连击或粘贴）
         if (!/[\x00-\x1F\x7F]/.test(data)) {
           // 由于 JavaScript 中部分多字节字符的 length 表现，这里按照字符串常规长度累加是安全的，
@@ -458,6 +471,13 @@ export default function Terminal({ sessionId, status, isActive, serverName }) {
     };
     window.addEventListener('terminal-font-size-changed', handleFontSizeChange);
     return () => window.removeEventListener('terminal-font-size-changed', handleFontSizeChange);
+  }, []);
+
+  // ── 设置变更时刷新热路径缓存（本地回显/快捷键） ────────────────
+  useEffect(() => {
+    refreshHotSettings(); // 挂载时同步一次最新设置
+    window.addEventListener('terminal-settings-changed', refreshHotSettings);
+    return () => window.removeEventListener('terminal-settings-changed', refreshHotSettings);
   }, []);
 
   // ── 状态变化提示 ────────────────────────────────────────────────

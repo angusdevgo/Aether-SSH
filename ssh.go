@@ -29,6 +29,7 @@ type SessionData struct {
 	Stdin               io.WriteCloser
 	HistoryStream       *commandHistoryStream
 	RemoteHistoryActive bool
+	keepaliveStop       chan struct{} // 关闭后通知 keepalive 协程退出
 }
 
 type SSHManager struct {
@@ -80,11 +81,8 @@ func removeHostKey(path string, hostname string) {
 	os.WriteFile(path, []byte(strings.Join(out, "\n")+"\n"), 0600)
 }
 
-func (m *SSHManager) Connect(sessionId string, conn Connection) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	// Setup auth methods
+// buildAuthMethods 根据连接配置构造 SSH 认证方式（Connect 与一次性 exec 共用）
+func buildAuthMethods(conn Connection) ([]ssh.AuthMethod, error) {
 	var authMethods []ssh.AuthMethod
 	if conn.AuthMethod == "password" {
 		authMethods = append(authMethods, ssh.Password(conn.Password))
@@ -104,11 +102,16 @@ func (m *SSHManager) Connect(sessionId string, conn Connection) error {
 			signer, err = ssh.ParsePrivateKey([]byte(conn.PrivateKey))
 		}
 		if err != nil {
-			return fmt.Errorf("invalid private key: %v", err)
+			return nil, fmt.Errorf("invalid private key: %v", err)
 		}
 		authMethods = append(authMethods, ssh.PublicKeys(signer))
 	}
+	return authMethods, nil
+}
 
+// buildHostKeyCallback 构造 host key 校验回调：已知密钥校验、未知主机自动记录、
+// 变更密钥移除旧记录并提示（ssh-hostkey-changed 事件）
+func (m *SSHManager) buildHostKeyCallback() ssh.HostKeyCallback {
 	knownHostsPath := filepath.Join(os.Getenv("USERPROFILE"), ".ssh", "known_hosts")
 	os.MkdirAll(filepath.Dir(knownHostsPath), 0700)
 	if _, err := os.Stat(knownHostsPath); os.IsNotExist(err) {
@@ -120,13 +123,12 @@ func (m *SSHManager) Connect(sessionId string, conn Connection) error {
 		hostKeyCallback = ssh.InsecureIgnoreHostKey()
 	}
 
-
-	customHostKeyCallback := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 		err := hostKeyCallback(hostname, remote, key)
 		if err == nil {
 			return nil
 		}
-		
+
 		var keyErr *knownhosts.KeyError
 		if errors.As(err, &keyErr) {
 			if len(keyErr.Want) == 0 {
@@ -155,11 +157,25 @@ func (m *SSHManager) Connect(sessionId string, conn Connection) error {
 		}
 		return err
 	}
+}
+
+func (m *SSHManager) Connect(sessionId string, conn Connection) error {
+	// 注意：整个拨号流程（SSH 握手 10s 超时 + SFTP + shell 探测）不持有 m.mu。
+	// 若在锁内执行，新连接建立期间所有已有会话的输入/输出/文件操作都会被冻结。
+	// m.mu 只保护 sessions/portForwards 等 map 的读写。
+
+	// Setup auth methods
+	authMethods, err := buildAuthMethods(conn)
+	if err != nil {
+		return err
+	}
+
+	hostKeyCb := m.buildHostKeyCallback()
 
 	config := &ssh.ClientConfig{
 		User:            conn.Username,
 		Auth:            authMethods,
-		HostKeyCallback: customHostKeyCallback,
+		HostKeyCallback: hostKeyCb,
 		Timeout:         10 * time.Second,
 		HostKeyAlgorithms: []string{
 			"ssh-ed25519",
@@ -208,14 +224,23 @@ func (m *SSHManager) Connect(sessionId string, conn Connection) error {
 
 	stdin, err := session.StdinPipe()
 	if err != nil {
+		session.Close()
+		sftpClient.Close()
+		client.Close()
 		return err
 	}
 	stdout, err := session.StdoutPipe()
 	if err != nil {
+		session.Close()
+		sftpClient.Close()
+		client.Close()
 		return err
 	}
 	stderr, err := session.StderrPipe()
 	if err != nil {
+		session.Close()
+		sftpClient.Close()
+		client.Close()
 		return err
 	}
 
@@ -229,6 +254,9 @@ func (m *SSHManager) Connect(sessionId string, conn Connection) error {
 		err = session.Shell()
 	}
 	if err != nil {
+		session.Close()
+		sftpClient.Close()
+		client.Close()
 		return err
 	}
 
@@ -237,6 +265,16 @@ func (m *SSHManager) Connect(sessionId string, conn Connection) error {
 		historyStream = newCommandHistoryStream()
 	}
 
+	// 同一 sessionId 重复连接时拒绝并释放新资源，避免覆盖导致旧连接泄漏
+	keepaliveStop := make(chan struct{})
+	m.mu.Lock()
+	if _, exists := m.sessions[sessionId]; exists {
+		m.mu.Unlock()
+		session.Close()
+		sftpClient.Close()
+		client.Close()
+		return fmt.Errorf("session already connected")
+	}
 	m.sessions[sessionId] = &SessionData{
 		Client:              client,
 		Session:             session,
@@ -244,7 +282,13 @@ func (m *SSHManager) Connect(sessionId string, conn Connection) error {
 		Stdin:               stdin,
 		HistoryStream:       historyStream,
 		RemoteHistoryActive: remoteHistoryActive,
+		keepaliveStop:       keepaliveStop,
 	}
+	m.mu.Unlock()
+
+	// 启动 keepalive 探测：检测 NAT 掉线/拔线等半开连接（无 keepalive 时
+	// client.Wait() 会永久阻塞，UI 永远收不到断开事件）
+	go m.keepaliveLoop(client, keepaliveStop)
 
 	// 启动读取 stdout/stderr
 	go m.pipeOutput(sessionId, stdout, historyStream)
@@ -266,6 +310,37 @@ func (m *SSHManager) Connect(sessionId string, conn Connection) error {
 	}()
 
 	return nil
+}
+
+// keepaliveLoop 周期性发送 SSH keepalive 全局请求，探测半开连接（NAT 掉线、
+// 拔线等）。服务器会回 REQUEST_FAILURE（accepted=false 但 err=nil），即连接存活；
+// 传输层故障或 15s 内无回包则视为死链，主动关闭 client，使 client.Wait() 返回
+// 并走常规的意外断开清理流程（触发 ssh-disconnected 事件）。
+func (m *SSHManager) keepaliveLoop(client *ssh.Client, stop chan struct{}) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			reply := make(chan error, 1)
+			go func() {
+				_, _, err := client.SendRequest("keepalive@openssh.com", true, nil)
+				reply <- err
+			}()
+			select {
+			case err := <-reply:
+				if err != nil {
+					client.Close()
+					return
+				}
+			case <-time.After(15 * time.Second):
+				client.Close()
+				return
+			}
+		case <-stop:
+			return
+		}
+	}
 }
 
 func (m *SSHManager) pipeOutput(sessionId string, r io.Reader, historyStream *commandHistoryStream) {
@@ -312,34 +387,55 @@ func (m *SSHManager) pipeOutput(sessionId string, r io.Reader, historyStream *co
 	}
 }
 
+// stopPortForwardsLocked 停止并移除会话的所有端口转发（调用方必须持有 m.mu）。
+// 会话死亡后若不清理，本地监听器会继续接受 TCP 连接并在 Dial 时静默失败。
+func (m *SSHManager) stopPortForwardsLocked(sessionId string) {
+	for _, e := range m.portForwards[sessionId] {
+		close(e.cancel)
+		e.listener.Close()
+	}
+	delete(m.portForwards, sessionId)
+}
+
+// teardownSessionLocked 关闭会话资源并从注册表移除（调用方必须持有 m.mu）。
+// 必须删除 map 条目：意外断开后若残留条目，僵尸会话会永远占位且后续
+// 操作（ListDir/WriteBytes 等）作用在死连接上。
+func (m *SSHManager) teardownSessionLocked(sessionId string, s *SessionData) {
+	if m.ctx != nil {
+		runtime.EventsOff(m.ctx, "terminal-input-"+sessionId)
+	}
+	m.stopPortForwardsLocked(sessionId)
+	if s.Stdin != nil {
+		s.Stdin.Close()
+	}
+	if s.Session != nil {
+		s.Session.Close()
+	}
+	if s.SFTP != nil {
+		s.SFTP.Close()
+	}
+	if s.Client != nil {
+		s.Client.Close()
+	}
+	if s.keepaliveStop != nil {
+		close(s.keepaliveStop)
+	}
+	delete(m.sessions, sessionId)
+}
+
 func (m *SSHManager) Disconnect(sessionId string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if s, ok := m.sessions[sessionId]; ok {
-		// 清理异步输入事件监听
-		if m.ctx != nil {
-			runtime.EventsOff(m.ctx, "terminal-input-"+sessionId)
-		}
-		s.Stdin.Close()
-		s.Session.Close()
-		s.SFTP.Close()
-		s.Client.Close()
-		delete(m.sessions, sessionId)
+		m.teardownSessionLocked(sessionId, s)
 	}
 }
 
 func (m *SSHManager) CloseSessionResources(sessionId string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	// 清理异步输入事件监听
-	if m.ctx != nil {
-		runtime.EventsOff(m.ctx, "terminal-input-"+sessionId)
-	}
 	if s, ok := m.sessions[sessionId]; ok {
-		if s.Stdin != nil { s.Stdin.Close() }
-		if s.Session != nil { s.Session.Close() }
-		if s.SFTP != nil { s.SFTP.Close() }
-		if s.Client != nil { s.Client.Close() }
+		m.teardownSessionLocked(sessionId, s)
 	}
 }
 
@@ -431,6 +527,43 @@ func (m *SSHManager) executeCmd(s *SessionData, cmd string) (string, error) {
 	session.Stdout = &stdoutBuf
 	err = session.Run(cmd)
 	return stdoutBuf.String(), err
+}
+
+// execOnce 建立一次性 SSH 连接执行单条命令并返回输出（不创建持久会话），
+// 用于脚本页对尚未连接的服务器发送指令
+func (m *SSHManager) execOnce(conn Connection, cmd string) (string, error) {
+	authMethods, err := buildAuthMethods(conn)
+	if err != nil {
+		return "", err
+	}
+	config := &ssh.ClientConfig{
+		User:            conn.Username,
+		Auth:            authMethods,
+		HostKeyCallback: m.buildHostKeyCallback(),
+		Timeout:         10 * time.Second,
+	}
+	target := fmt.Sprintf("%s:%d", strings.TrimSpace(conn.Host), conn.Port)
+	client, err := ssh.Dial("tcp", target, config)
+	if err != nil {
+		return "", err
+	}
+	defer client.Close()
+
+	session, err := client.NewSession()
+	if err != nil {
+		return "", err
+	}
+	defer session.Close()
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	session.Stdout = &stdoutBuf
+	session.Stderr = &stderrBuf
+	err = session.Run(cmd)
+	out := stdoutBuf.String()
+	if err != nil {
+		return out, fmt.Errorf("%v: %s", err, strings.TrimSpace(stderrBuf.String()))
+	}
+	return out, nil
 }
 
 func parseStatCpus(lines []string) map[string][]uint64 {

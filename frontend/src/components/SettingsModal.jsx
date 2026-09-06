@@ -326,9 +326,10 @@ export default function SettingsModal({ onClose, addToast, onRestored, inline = 
 
       setShortcuts((prev) => {
         const updated = { ...prev, [listeningKey]: combined };
-        localStorage.setItem('appShortcuts', JSON.stringify(combined === 'Esc' ? '' : JSON.stringify(updated)));
         // 直接存盘
         localStorage.setItem('appShortcuts', JSON.stringify(updated));
+        // 通知终端组件刷新热路径快捷键缓存
+        window.dispatchEvent(new CustomEvent('terminal-settings-changed'));
         return updated;
       });
 
@@ -359,8 +360,10 @@ export default function SettingsModal({ onClose, addToast, onRestored, inline = 
   const handleToggleLocalEcho = () => {
     const nextVal = !terminalLocalEcho;
     setTerminalLocalEcho(nextVal);
-    // 注意：写入 'true'/'false' 字符串，Terminal.jsx 通过 getItem('terminalLocalEcho') !== 'false' 判断
+    // 注意：写入 'true'/'false' 字符串，Terminal 组件通过缓存判断（默认开启）
     localStorage.setItem('terminalLocalEcho', nextVal ? 'true' : 'false');
+    // 通知终端组件刷新热路径设置缓存
+    window.dispatchEvent(new CustomEvent('terminal-settings-changed'));
     addToast(nextVal ? '已开启本地回显（输入即时显示，高延迟服务器推荐）' : '已关闭本地回显（等待服务器回显）', 'success');
   };
 

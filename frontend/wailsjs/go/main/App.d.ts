@@ -12,11 +12,17 @@ export function DeleteConnection(arg1:string):Promise<boolean>;
 
 export function DeleteItem(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
+export function DeleteSSHKey(arg1:string):Promise<boolean>;
+
 export function DisconnectSSH(arg1:string):Promise<void>;
 
 export function DownloadFile(arg1:string,arg2:string):Promise<void>;
 
 export function EditWithLocalEditor(arg1:string,arg2:string):Promise<string>;
+
+export function ExecOnConnection(arg1:string,arg2:string):Promise<string>;
+
+export function GenerateSSHKey(arg1:string):Promise<Record<string, any>>;
 
 export function GetConnections():Promise<Array<main.Connection>>;
 
@@ -26,11 +32,15 @@ export function GetWebdavConfig():Promise<Record<string, string>>;
 
 export function GetWsConnectionInfo():Promise<Record<string, any>>;
 
+export function ImportSSHKey(arg1:string,arg2:string,arg3:string):Promise<Record<string, any>>;
+
 export function IsPortableVersion():Promise<boolean>;
 
 export function ListDir(arg1:string,arg2:string):Promise<Array<Record<string, any>>>;
 
 export function ListPortForwards(arg1:string):Promise<Array<Record<string, any>>>;
+
+export function ListSSHKeys():Promise<Array<Record<string, any>>>;
 
 export function ListWebdavBackups():Promise<Array<Record<string, any>>>;
 

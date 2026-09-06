@@ -22,6 +22,10 @@ export function DeleteItem(arg1, arg2, arg3) {
   return window['go']['main']['App']['DeleteItem'](arg1, arg2, arg3);
 }
 
+export function DeleteSSHKey(arg1) {
+  return window['go']['main']['App']['DeleteSSHKey'](arg1);
+}
+
 export function DisconnectSSH(arg1) {
   return window['go']['main']['App']['DisconnectSSH'](arg1);
 }
@@ -32,6 +36,14 @@ export function DownloadFile(arg1, arg2) {
 
 export function EditWithLocalEditor(arg1, arg2) {
   return window['go']['main']['App']['EditWithLocalEditor'](arg1, arg2);
+}
+
+export function ExecOnConnection(arg1, arg2) {
+  return window['go']['main']['App']['ExecOnConnection'](arg1, arg2);
+}
+
+export function GenerateSSHKey(arg1) {
+  return window['go']['main']['App']['GenerateSSHKey'](arg1);
 }
 
 export function GetConnections() {
@@ -50,6 +62,10 @@ export function GetWsConnectionInfo() {
   return window['go']['main']['App']['GetWsConnectionInfo']();
 }
 
+export function ImportSSHKey(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ImportSSHKey'](arg1, arg2, arg3);
+}
+
 export function IsPortableVersion() {
   return window['go']['main']['App']['IsPortableVersion']();
 }
@@ -60,6 +76,10 @@ export function ListDir(arg1, arg2) {
 
 export function ListPortForwards(arg1) {
   return window['go']['main']['App']['ListPortForwards'](arg1);
+}
+
+export function ListSSHKeys() {
+  return window['go']['main']['App']['ListSSHKeys']();
 }
 
 export function ListWebdavBackups() {

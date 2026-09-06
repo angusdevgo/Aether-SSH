@@ -11,6 +11,7 @@ import Toast from './components/Toast.jsx';
 import CommandHistory from './components/CommandHistory.jsx';
 import QuickCommands from './components/QuickCommands.jsx';
 import PortForward from './components/PortForward.jsx';
+import KeyManager from './components/KeyManager.jsx';
 import { useSessions } from './useSessions.js';
 import GlobalDialog from './components/GlobalDialog.jsx';
 import GlobalContextMenu from './components/GlobalContextMenu.jsx';
@@ -30,19 +31,16 @@ export default function App() {
   const [showAddServer, setShowAddServer] = useState(false);
   const [editServer, setEditServer] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [showKeys, setShowKeys] = useState(false);
   const [showTrayPanel, setShowTrayPanel] = useState(false);
-  const [showProbe, setShowProbe] = useState(false); // 探针面板 toggle
   const [tabMenu, setTabMenu] = useState(null); // { sessionId, x, y }
   const [renamingTab, setRenamingTab] = useState(null); // sessionId being renamed
   const [renameValue, setRenameValue] = useState('');
-  const [showQuickCommands, setShowQuickCommands] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [monitoringEnabled, setMonitoringEnabled] = useState({}); // { [sessionId]: boolean }
   const [serverListViewMode, setServerListViewMode] = useState(localStorage.getItem('serverListViewMode') || 'grid'); // 'grid' | 'table'
   const [fileManagerPosition, setFileManagerPosition] = useState(localStorage.getItem('fileManagerPosition') || 'tab'); // 'tab' | 'right' | 'bottom'
-  const [navRailTab, setNavRailTab] = useState('servers'); // 'servers' | 'assets' | 'projects' | 'snippets' | 'settings'
+  const [navRailTab, setNavRailTab] = useState('servers'); // 'servers' | 'assets' | 'snippets' | 'settings'
   
   // ── 新增自动检测更新状态 ──────────────────────────────
   const [startupUpdateInfo, setStartupUpdateInfo] = useState(null);
@@ -858,7 +856,7 @@ export default function App() {
                     <div className="stat-lbl">{t('在线节点')}</div>
                   </div>
                   <div className="stat-item">
-                    <div className="stat-val" style={{ color: 'var(--red)' }}>{Object.values(pings).filter(p => !p.online && p.pinged).length}</div>
+                    <div className="stat-val" style={{ color: 'var(--red)' }}>{Object.values(pings).filter(p => !p.online).length}</div>
                     <div className="stat-lbl">{t('离线节点')}</div>
                   </div>
                 </div>
@@ -970,48 +968,9 @@ export default function App() {
           {navRailTab === 'assets' && (
             <div className="m3-page-animate" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '24px 32px', background: 'var(--m3-surface-dim)', overflowY: 'auto' }}>
               <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Key size={20} /> 凭据与 SSH 密钥管理
+                <Key size={20} /> {t('凭据与 SSH 密钥管理')}
               </div>
-              <div style={{ display: 'flex', gap: 24, flex: 1, overflow: 'hidden' }}>
-                <div style={{ width: 280, borderRadius: 'var(--m3-radius-lg)', background: 'var(--m3-surface-container)', border: '1px solid var(--m3-outline-variant)', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {[
-                    { name: 'id_rsa', path: '~/.ssh/id_rsa', type: 'RSA 4096' },
-                    { name: 'id_ed25519', path: '~/.ssh/id_ed25519', type: 'ED25519' },
-                  ].map((key, i) => (
-                    <div key={i} style={{
-                      display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '12px 14px', borderRadius: 'var(--m3-radius-md)',
-                      background: i === 0 ? 'var(--m3-primary-container)' : 'var(--m3-surface-container-high)',
-                      border: i === 0 ? '1px solid var(--m3-primary)' : '1px solid var(--m3-outline-variant)',
-                      cursor: 'pointer',
-                    }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 'var(--m3-radius-sm)', background: 'rgba(15,118,110,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Key size={18} style={{ color: 'var(--m3-on-primary-container)' }} /></div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', fontFamily: 'var(--font-mono)' }}>{key.path}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>Type {key.type}</div>
-                      </div>
-                    </div>
-                  ))}
-                  <button className="btn btn-primary" style={{ marginTop: 12, borderRadius: 'var(--m3-radius-md)' }}>
-                    + 生成/导入新密钥
-                  </button>
-                </div>
-                <div className="m3-card" style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', marginBottom: 16 }}>密钥详情</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {[
-                      { label: '文件路径', value: '~/.ssh/id_ed25519' },
-                      { label: '算法类型', value: 'ED25519' },
-                      { label: '指纹 (SHA256)', value: 'SHA256:8Zk9+mX.../aether' },
-                    ].map((item, idx) => (
-                      <div key={idx} className="form-group-compact">
-                        <label style={{ fontSize: 12, color: 'var(--text-3)' }}>{item.label}</label>
-                        <input className="input-compact" readOnly value={item.value} style={{ fontFamily: 'var(--font-mono)' }} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <KeyManager addToast={addToast} />
             </div>
           )}
 
@@ -1022,7 +981,7 @@ export default function App() {
                 <Zap size={20} /> 常用脚本与快捷指令
               </div>
               <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-                <QuickCommands addToast={addToast} />
+                <QuickCommands addToast={addToast} servers={servers} sessions={sessions} />
               </div>
             </div>
           )}
@@ -1103,9 +1062,9 @@ export default function App() {
                         }
                       }}
                     >
-                      <option value="tab">独立页签</option>
-                      <option value="left">左侧分屏</option>
-                      <option value="bottom">底部分屏</option>
+                      <option value="tab">{t('独立页签')}</option>
+                      <option value="left">{t('左侧分屏')}</option>
+                      <option value="bottom">{t('底部分屏')}</option>
                     </select>
                   </div>
                 )}
@@ -1181,7 +1140,6 @@ export default function App() {
                         <div style={{ display: contentTab === 'history' ? 'block' : 'none', height: '100%', flex: 1 }}>
                           <CommandHistory
                             sessionId={s.id}
-                            serverKey={s.serverId}
                             addToast={addToast}
                           />
                         </div>
@@ -1285,71 +1243,6 @@ export default function App() {
         />
       )}
 
-      {/* ── 密钥管理 Modal ─────────────────────────────────── */}
-      {showKeys && (
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowKeys(false)}>
-          <div className="modal modal-xl" style={{ display: 'flex', flexDirection: 'column', height: '70vh', background: 'var(--bg-1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Key size={16} /> SSH 密钥管理
-              </div>
-              <button className="btn btn-ghost btn-icon" onClick={() => setShowKeys(false)} style={{ color: 'var(--text-3)' }}>✕</button>
-            </div>
-            <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-              {/* 左栏：密钥列表 */}
-              <div style={{ width: 260, borderRight: '1px solid var(--border)', padding: '16px 12px', overflowY: 'auto', background: 'var(--bg-0)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {[
-                  { name: 'id_rsa', path: '~/.ssh/id_rsa', type: 'RSA 4096' },
-                  { name: 'id_ed25519', path: '~/.ssh/id_ed25519', type: 'ED25519' },
-                ].map((key, i) => (
-                  <div key={i} style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '12px 14px', borderRadius: 10,
-                    background: i === 0 ? 'rgba(16,185,129,0.1)' : 'var(--bg-2)',
-                    border: i === 0 ? '1px solid var(--green-glow)' : '1px solid var(--border)',
-                    cursor: 'pointer',
-                  }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--green-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Key size={18} style={{ color: 'var(--green)' }} /></div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', fontFamily: 'var(--font-mono)' }}>{key.path}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>Type {key.type}</div>
-                    </div>
-                  </div>
-                ))}
-                <button className="btn btn-secondary" style={{ marginTop: 8, fontSize: 13 }}>
-                  + 生成新密钥
-                </button>
-              </div>
-              {/* 右栏：密钥详情 */}
-              <div style={{ flex: 1, padding: '28px 32px', overflowY: 'auto' }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 24 }}>密钥详情</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {[
-                    { label: 'Label', value: '~/.ssh/id_ed25519' },
-                    { label: '类型', value: 'ED25519' },
-                  ].map(({ label, value }) => (
-                    <div key={label}>
-                      <div style={{ fontSize: 12, color: 'var(--text-4)', marginBottom: 4 }}>{label}</div>
-                      <div style={{ fontSize: 14, color: 'var(--text-1)', fontFamily: 'var(--font-mono)' }}>{value}</div>
-                    </div>
-                  ))}
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-4)', marginBottom: 8 }}>密钥导出</div>
-                    <button
-                      className="btn btn-primary"
-                      style={{ width: '100%', justifyContent: 'center' }}
-                      onClick={() => addToast('密钥功能需要在连接到服务器后使用', 'info', 3000)}
-                    >
-                      导出到主机
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── Toasts ────────────────────────────────────────── */}
       <Toast toasts={toasts} />
       <GlobalDialog />
@@ -1375,184 +1268,6 @@ export default function App() {
                 background: 'linear-gradient(135deg,#ef4444,#dc2626)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}><Monitor size={22} style={{ color: '#fff' }} /></div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#f0f6fc', marginBottom: 3 }}>
-                  {connectingServer.server.name || connectingServer.server.host}
-                </div>
-                <div style={{ fontSize: 12, color: '#3fb950', fontFamily: 'monospace' }}>
-                  SSH {connectingServer.server.host}:{connectingServer.server.port || 22}
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                <button
-                  style={{
-                    padding: '5px 14px', fontSize: 12, borderRadius: 8, cursor: 'pointer',
-                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-                    color: '#8b949e',
-                  }}
-                  onClick={() => setConnectingServer(null)}
-                >
-                  取消
-                </button>
-              </div>
-            </div>
-
-            {/* 双进度条（参考图一）*/}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              {/* 左进度点 */}
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--green)', flexShrink: 0, boxShadow: '0 0 8px var(--green)' }} />
-              {/* 进度条 */}
-              <div style={{ flex: 1, height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%', borderRadius: 4,
-                  background: 'linear-gradient(90deg, var(--green), #86efac)',
-                  animation: 'ssh-progress-indeterminate 1.4s ease-in-out infinite',
-                }} />
-              </div>
-              {/* WiFi 图标 */}
-              <div style={{ flexShrink: 0, fontSize: 14, color: 'var(--green)' }}>📡</div>
-              {/* 第二段进度条 */}
-              <div style={{ flex: 1, height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%', borderRadius: 4,
-                  background: 'linear-gradient(90deg, var(--green), #86efac)',
-                  animation: 'ssh-progress-indeterminate 1.4s ease-in-out 0.4s infinite',
-                }} />
-              </div>
-              {/* 右旋转图标 */}
-              <div style={{ flexShrink: 0, animation: 'spin 1.2s linear infinite', fontSize: 14, color: '#6e7681' }}>⟳</div>
-            </div>
-
-            {/* 提示文字 */}
-            <div style={{ fontSize: 12, color: '#6e7681', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ animation: 'spin 1.5s linear infinite', display: 'inline-block' }}>⟳</span>
-              正在建立 SSH 连接，请稍候...
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── 托盘弹窗面板（参考图二/图三）─────────────────── */}
-      {showTrayPanel && (
-        <div
-          style={{
-            position: 'fixed', bottom: 48, right: 16, zIndex: 8000,
-            width: 280,
-            borderRadius: 14,
-            background: 'rgba(13,17,23,0.97)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            boxShadow: '0 16px 48px rgba(0,0,0,0.7)',
-            overflow: 'hidden',
-            display: 'flex', flexDirection: 'column',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* 标题栏 */}
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '14px 16px 12px',
-            borderBottom: '1px solid rgba(255,255,255,0.07)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <img src={logoImg} alt="logo" style={{ width: 24, height: 24, borderRadius: 6 }} />
-              <span style={{ fontSize: 14, fontWeight: 700, color: '#f0f6fc' }}>Aether</span>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6e7681', fontSize: 14, padding: '2px 6px' }}
-                title="展开窗口"
-                onClick={() => { import('../wailsjs/runtime/runtime.js').then(r => r.WindowShow()); setShowTrayPanel(false); }}
-              >⤢</button>
-              <button
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6e7681', fontSize: 14, padding: '2px 6px' }}
-                onClick={() => setShowTrayPanel(false)}
-              >✕</button>
-            </div>
-          </div>
-
-          {/* 内容区 */}
-          <div style={{ flex: 1, padding: '12px 0', minHeight: 120 }}>
-            {sessions.filter(s => s.status === 'connected').length > 0 ? (
-              <>
-                <div style={{ fontSize: 11, color: '#6e7681', padding: '0 16px 8px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: 1 }}>会话</div>
-                {sessions.filter(s => s.status === 'connected').map(s => (
-                  <div key={s.id} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '10px 16px', cursor: 'pointer',
-                    transition: 'background 0.15s',
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    onClick={() => {
-                      import('../wailsjs/runtime/runtime.js').then(r => r.WindowShow());
-                      setActiveSessionId(s.id);
-                      setShowTrayPanel(false);
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 6px var(--green)' }} />
-                      <span style={{ fontSize: 14, color: '#f0f6fc', fontWeight: 500 }}>{s.serverName}</span>
-                    </div>
-                    <span style={{ fontSize: 12, color: '#6e7681' }}>已连接</span>
-                  </div>
-                ))}
-              </>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '28px 16px', gap: 10 }}>
-                <div style={{ fontSize: 40 }}>😤</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#f0f6fc' }}>一切都很安静</div>
-                <div style={{ fontSize: 12, color: '#6e7681', textAlign: 'center', lineHeight: 1.6 }}>
-                  去连接个服务器吧，已经想念你了 🌿
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 底部退出按钮 */}
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '10px 16px' }}>
-            <button
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                width: '100%', background: 'none', border: 'none',
-                cursor: 'pointer', color: '#6e7681', fontSize: 13,
-                padding: '6px 0', transition: 'color 0.15s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.color = '#f0f6fc'}
-              onMouseLeave={e => e.currentTarget.style.color = '#6e7681'}
-              onClick={Quit}
-            >
-              <span>⏻</span> 退出 Aether
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Toasts ────────────────────────────────────────── */}
-      <Toast toasts={toasts} />
-      <GlobalDialog />
-
-      {/* ── 连接进度卡片 Overlay（参考图一）──────────────── */}
-      {connectingServer && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-        }}>
-          <div style={{
-            width: 380, borderRadius: 16, overflow: 'hidden',
-            background: 'rgba(22,27,34,0.97)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
-            padding: '20px 24px 22px',
-          }}>
-            {/* 标题行：图标 + 名称 + 按钮 */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 18 }}>
-              <div style={{
-                width: 42, height: 42, borderRadius: 10, flexShrink: 0,
-                background: 'linear-gradient(135deg,#ef4444,#dc2626)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 22,
-              }}>🖥</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#f0f6fc', marginBottom: 3 }}>
                   {connectingServer.server.name || connectingServer.server.host}
