@@ -130,7 +130,7 @@ const defaultWebdavForm = {
   remotePath: '/Aether/',
 };
 
-export default function SettingsModal({ onClose, addToast, onRestored }) {
+export default function SettingsModal({ onClose, addToast, onRestored, inline = false }) {
   const CURRENT_VERSION = APP_VERSION;
   const [updateInfo, setUpdateInfo] = useState(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -352,6 +352,7 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
     localStorage.setItem('themeAccent', color);
     if (useCustomAccent) {
       document.documentElement.style.setProperty('--green', color);
+      document.documentElement.style.setProperty('--m3-primary', color);
     }
   };
 
@@ -532,35 +533,26 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
     }
   };
 
-  return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal modal-xl" style={{ display: 'flex', flexDirection: 'column', height: '80vh' }}>
-        
-        {/* Settings Header */}
-        <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px' }}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-1)' }}>{t.title}</div>
-          <button className="btn btn-ghost btn-icon" onClick={onClose} style={{ color: 'var(--text-3)' }}>✕</button>
-        </div>
-
-        {/* Settings Body Layout */}
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          
-          {/* Settings Sidebar */}
-          <div className="settings-sidebar" style={{ width: 220, padding: '16px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {TABS.map(tab => (
-              <div 
-                key={tab.id}
-                className={`sidebar-menu-item ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
-                style={{ padding: '8px 12px', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
-              >
-                <span>{tab.icon}</span> {t.tabs[tab.id]}
-              </div>
-            ))}
+  const content = (
+    <>
+    <div style={{ display: 'flex', flex: 1, height: '100%', overflow: 'hidden', background: inline ? 'var(--m3-surface-dim)' : 'transparent' }}>
+      {/* Settings Sidebar */}
+      <div className="settings-sidebar" style={{ width: 220, minWidth: 220, padding: '20px 12px', display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--m3-surface-container-low)', borderRight: '1px solid var(--m3-outline-variant)' }}>
+        <div style={{ fontSize: 16, fontWeight: 700, padding: '0 8px 12px', color: 'var(--text-1)' }}>{t.title}</div>
+        {TABS.map(tab => (
+          <div 
+            key={tab.id}
+            className={`sidebar-menu-item ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+            style={{ padding: '10px 14px', borderRadius: 'var(--m3-radius-md)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}
+          >
+            <span>{tab.icon}</span> {t.tabs[tab.id]}
           </div>
+        ))}
+      </div>
 
-          {/* Settings Content */}
-          <div className="settings-content" style={{ flex: 1, padding: '32px 48px', overflowY: 'auto' }}>
+      {/* Settings Content */}
+      <div className="settings-content" style={{ flex: 1, padding: '32px 48px', overflowY: 'auto', background: 'var(--m3-surface-dim)' }}>
             
             {activeTab === 'app' && (
               <div style={{ display: 'flex', flexDirection: 'column', padding: '16px 24px', gap: 32, maxWidth: 640 }}>
@@ -822,50 +814,56 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
               </div>
             )}
             {activeTab === 'appearance' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 680 }}>
+                {/* ── 界面与显示设置 ── */}
                 <div>
-                  <h3 style={{ fontSize: 14, color: 'var(--text-1)', marginBottom: 12, fontWeight: 600 }}>{t.appearance.langTitle}</h3>
-                  <div className="form-group" style={{ background: 'var(--bg-2)', padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ color: 'var(--text-1)', fontSize: 13 }}>{t.appearance.langLabel}</div>
-                        <div style={{ color: 'var(--text-4)', fontSize: 11 }}>{t.appearance.langDesc}</div>
+                  <div className="m3-settings-section-title">🎨 {t.appearance.langTitle}</div>
+                  <div className="m3-settings-card">
+                    <div className="m3-list-tile">
+                      <div className="m3-list-tile-content">
+                        <div className="m3-list-tile-title">{t.appearance.langLabel}</div>
+                        <div className="m3-list-tile-subtitle">{t.appearance.langDesc}</div>
                       </div>
-                      <select className="select" style={{ width: 200 }} value={language} onChange={handleLanguageChange}>
+                      <select className="m3-dropdown-button" value={language} onChange={handleLanguageChange}>
                         <option value="zh-CN">简体中文</option>
                         <option value="en-US">English</option>
                       </select>
                     </div>
-                    <div className="divider" style={{ margin: '12px 0', borderTop: '1px solid var(--border)' }} />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ color: 'var(--text-1)', fontSize: 13 }}>{t.appearance.fontLabel}</div>
-                        <div style={{ color: 'var(--text-4)', fontSize: 11 }}>{t.appearance.fontDesc}</div>
+
+                    <div className="m3-divider" />
+
+                    <div className="m3-list-tile">
+                      <div className="m3-list-tile-content">
+                        <div className="m3-list-tile-title">{t.appearance.fontLabel}</div>
+                        <div className="m3-list-tile-subtitle">{t.appearance.fontDesc}</div>
                       </div>
-                      <select className="select" style={{ width: 200 }} value={appFont} onChange={handleFontChange}>
+                      <select className="m3-dropdown-button" value={appFont} onChange={handleFontChange}>
                         <option value="system-ui">系统默认</option>
                         <option value="Open Sans">Open Sans</option>
                         <option value="Inter">Inter</option>
                         <option value="JetBrains Mono">JetBrains Mono</option>
                       </select>
                     </div>
-                    <div className="divider" style={{ margin: '12px 0', borderTop: '1px solid var(--border)' }} />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ color: 'var(--text-1)', fontSize: 13 }}>{t.appearance.termFontLabel}</div>
-                        <div style={{ color: 'var(--text-4)', fontSize: 11 }}>{t.appearance.termFontDesc}</div>
+
+                    <div className="m3-divider" />
+
+                    <div className="m3-list-tile">
+                      <div className="m3-list-tile-content">
+                        <div className="m3-list-tile-title">{t.appearance.termFontLabel}</div>
+                        <div className="m3-list-tile-subtitle">{t.appearance.termFontDesc}</div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                         <input 
                           type="range" 
                           min="10" 
                           max="28" 
                           step="1" 
+                          className="m3-slider"
                           value={terminalFontSize} 
                           onChange={handleTerminalFontChange} 
-                          style={{ cursor: 'pointer' }}
+                          style={{ '--slider-fill': `${((terminalFontSize - 10) / (28 - 10)) * 100}%` }}
                         />
-                        <span style={{ fontSize: 13, width: 32, textAlign: 'right', color: 'var(--text-1)' }}>{terminalFontSize}px</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, width: 36, textAlign: 'right', color: 'var(--m3-on-surface-variant)', fontFamily: 'var(--font-mono)' }}>{terminalFontSize}px</span>
                       </div>
                     </div>
                   </div>
@@ -873,31 +871,17 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
 
                 {/* ── 本地回显 ── */}
                 <div>
-                  <h3 style={{ fontSize: 14, color: 'var(--text-1)', marginBottom: 12, fontWeight: 600 }}>本地回显</h3>
-                  <div className="form-group" style={{ background: 'var(--bg-2)', padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ color: 'var(--text-1)', fontSize: 13 }}>预测性本地回显</div>
-                        <div style={{ color: 'var(--text-4)', fontSize: 11, marginTop: 2 }}>输入时立即本地显示，不等服务器回显。高延迟服务器建议开启；若出现字符重复/抖动可关闭</div>
+                  <div className="m3-settings-section-title">⚡ 本地回显</div>
+                  <div className="m3-settings-card">
+                    <div className="m3-list-tile" onClick={handleToggleLocalEcho}>
+                      <div className="m3-list-tile-content">
+                        <div className="m3-list-tile-title">预测性本地回显</div>
+                        <div className="m3-list-tile-subtitle">
+                          输入时立即本地显示，不等服务器回显。高延迟服务器建议开启；若出现字符重复/抖动可关闭
+                        </div>
                       </div>
-                      <div
-                        onClick={handleToggleLocalEcho}
-                        style={{
-                          width: 40, height: 24,
-                          background: terminalLocalEcho ? 'var(--green)' : 'var(--bg-4)',
-                          borderRadius: 12, position: 'relative', cursor: 'pointer',
-                          transition: 'background 0.2s ease',
-                          border: '1px solid var(--border)'
-                        }}
-                      >
-                        <div style={{
-                          position: 'absolute',
-                          left: terminalLocalEcho ? 18 : 2,
-                          top: 1, width: 20, height: 20,
-                          background: '#fff', borderRadius: '50%',
-                          transition: 'left 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
-                        }} />
+                      <div className={`m3-switch ${terminalLocalEcho ? 'active' : ''}`}>
+                        <div className="m3-switch-thumb" />
                       </div>
                     </div>
                   </div>
@@ -905,49 +889,69 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
 
                 {/* ── 终端颜色主题 ── */}
                 <div>
-                  <h3 style={{ fontSize: 14, color: 'var(--text-1)', marginBottom: 12, fontWeight: 600 }}>终端颜色主题</h3>
-                  <div className="form-group" style={{ background: 'var(--bg-2)', padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                    <div style={{ color: 'var(--text-4)', fontSize: 11, marginBottom: 12 }}>选择终端的配色风格，即时生效</div>
-                    <div className="theme-palette-grid">
-                      {[
-                        { key: 'aether',      name: 'Aether Default', swatches: ['var(--green)', '#58a6ff', '#bc8cff', '#ff7b72'] },
-                        { key: 'tokyo-night', name: 'Tokyo Night',    swatches: ['#7aa2f7', '#bb9af7', '#73daca', '#f7768e'] },
-                        { key: 'catppuccin',  name: 'Catppuccin',     swatches: ['#cba6f7', '#89b4fa', '#a6e3a1', '#f38ba8'] },
-                        { key: 'dracula',     name: 'Dracula',        swatches: ['#ff79c6', '#bd93f9', '#50fa7b', '#ff5555'] },
-                      ].map(({ key, name, swatches }) => (
-                        <div
-                          key={key}
-                          className={`theme-palette-card${terminalColorTheme === key ? ' active' : ''}`}
-                          onClick={() => {
-                            setTerminalColorTheme(key);
-                            localStorage.setItem('terminalColorTheme', key);
-                            window.dispatchEvent(new CustomEvent('terminal-theme-changed', { detail: key }));
-                          }}
-                        >
-                          <div className="theme-palette-swatches">
-                            {swatches.map((c, i) => (
-                              <div key={i} className="theme-palette-swatch" style={{ background: c }} />
-                            ))}
+                  <div className="m3-settings-section-title">🎨 终端颜色主题</div>
+                  <div className="m3-settings-card">
+                    <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      <div className="m3-list-tile-subtitle" style={{ marginTop: 0 }}>选择终端的配色风格，即时生效</div>
+                      <div className="theme-palette-grid">
+                        {[
+                          { key: 'aether',      name: 'Aether Default', swatches: ['var(--green)', '#58a6ff', '#bc8cff', '#ff7b72'] },
+                          { key: 'tokyo-night', name: 'Tokyo Night',    swatches: ['#7aa2f7', '#bb9af7', '#73daca', '#f7768e'] },
+                          { key: 'catppuccin',  name: 'Catppuccin',     swatches: ['#cba6f7', '#89b4fa', '#a6e3a1', '#f38ba8'] },
+                          { key: 'dracula',     name: 'Dracula',        swatches: ['#ff79c6', '#bd93f9', '#50fa7b', '#ff5555'] },
+                        ].map(({ key, name, swatches }) => (
+                          <div
+                            key={key}
+                            className={`theme-palette-card${terminalColorTheme === key ? ' active' : ''}`}
+                            onClick={() => {
+                              setTerminalColorTheme(key);
+                              localStorage.setItem('terminalColorTheme', key);
+                              window.dispatchEvent(new CustomEvent('terminal-theme-changed', { detail: key }));
+                            }}
+                          >
+                            <div className="theme-palette-swatches">
+                              {swatches.map((c, i) => (
+                                <div key={i} className="theme-palette-swatch" style={{ background: c }} />
+                              ))}
+                            </div>
+                            <div className="theme-palette-name">{name}</div>
                           </div>
-                          <div className="theme-palette-name">{name}</div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <h3 style={{ fontSize: 14, color: 'var(--text-1)', marginBottom: 12, fontWeight: 600 }}>{t.appearance.themeTitle}</h3>
-                  <div className="form-group" style={{ background: 'var(--bg-2)', padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ color: 'var(--text-1)', fontSize: 13 }}>{t.appearance.themeLabel}</div>
-                        <div style={{ color: 'var(--text-4)', fontSize: 11 }}>{t.appearance.themeDesc}</div>
+                  <div className="m3-settings-section-title">🎨 {t.appearance.themeTitle}</div>
+                  <div className="m3-settings-card">
+                    <div className="m3-list-tile">
+                      <div className="m3-list-tile-content">
+                        <div className="m3-list-tile-title">{t.appearance.themeLabel}</div>
+                        <div className="m3-list-tile-subtitle">{t.appearance.themeDesc}</div>
                       </div>
-                      <div style={{ display: 'flex', background: 'var(--bg-1)', borderRadius: 'var(--radius-xl)', padding: 4, border: '1px solid var(--border)' }}>
-                        <button className={`btn btn-sm ${themeMode === 'light' ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => handleThemeChange('light')} style={{ borderRadius: 'var(--radius-xl)', background: themeMode === 'light' ? 'var(--bg-3)' : 'transparent' }}>{t.appearance.themeLight}</button>
-                        <button className={`btn btn-sm ${themeMode === 'system' ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => handleThemeChange('system')} style={{ borderRadius: 'var(--radius-xl)', background: themeMode === 'system' ? 'var(--bg-3)' : 'transparent' }}>{t.appearance.themeSys}</button>
-                        <button className={`btn btn-sm ${themeMode === 'dark' ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => handleThemeChange('dark')} style={{ borderRadius: 'var(--radius-xl)', background: themeMode === 'dark' ? 'var(--bg-3)' : 'transparent' }}>{t.appearance.themeDark}</button>
+                      <div className="m3-segmented-button">
+                        <button 
+                          className={`m3-segmented-segment ${themeMode === 'system' ? 'active' : ''}`} 
+                          onClick={() => handleThemeChange('system')}
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+                          {t.appearance.themeSys}
+                        </button>
+                        <button 
+                          className={`m3-segmented-segment ${themeMode === 'light' ? 'active' : ''}`} 
+                          onClick={() => handleThemeChange('light')}
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                          {t.appearance.themeLight}
+                        </button>
+                        <button 
+                          className={`m3-segmented-segment ${themeMode === 'dark' ? 'active' : ''}`} 
+                          onClick={() => handleThemeChange('dark')}
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                          {t.appearance.themeDark}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1324,7 +1328,6 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
           </div>
         </div>
 
-      </div>
       {/* 确认恢复弹窗（含列表选择） */}
       {confirmRestore && (
         <div className="modal-overlay" style={{ zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
@@ -1371,6 +1374,22 @@ export default function SettingsModal({ onClose, addToast, onRestored }) {
           </div>
         </div>
       )}
+    </>
+  );
+
+  if (inline) {
+    return content;
+  }
+
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal modal-xl" style={{ display: 'flex', flexDirection: 'column', height: '80vh' }}>
+        <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px' }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-1)' }}>{t.title}</div>
+          <button className="btn btn-ghost btn-icon" onClick={onClose} style={{ color: 'var(--text-3)' }}>✕</button>
+        </div>
+        {content}
+      </div>
     </div>
   );
 }

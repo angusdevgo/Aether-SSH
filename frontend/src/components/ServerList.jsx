@@ -127,87 +127,113 @@ export default function ServerList({
           const sessionForServer = sessions.find(s => s.serverId === server.id && s.status === 'connected');
           const osInfo = getOSInfo(server.name, server.os, sessionForServer?.osInfo || null);
 
-          return (
-            <div
-              key={server.id}
-              className={`server-card-modern ${active ? 'active' : ''}`}
-              onClick={() => onConnect(server)}
-              onContextMenu={(e) => handleContextMenu(e, server)}
-              onMouseEnter={() => setHoveredId(server.id)}
-              onMouseLeave={() => setHoveredId(null)}
-              title={`${server.username}@${server.host}:${server.port || 22}`}
-            >
-              {/* OS 系统图标 */}
-              <div style={{
-                width: 40,
-                height: 40,
-                borderRadius: 12,
-                background: osInfo.bg,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 20,
-                color: '#fff',
-                flexShrink: 0,
-                boxShadow: `0 4px 14px ${osInfo.bg}44`,
-              }}>
-                {osInfo.icon}
-              </div>
-
-              <div className="server-info" style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>
-                <div className="server-name" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {server.name || server.host}
-                  </span>
-                  {connected && (
-                    <span className="status-conn-badge">
-                      ● CONN
-                    </span>
-                  )}
-                </div>
-                <div className="server-host" style={{ color: 'var(--text-3)', fontSize: 11, fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {server.username}@{server.host}
-                </div>
-              </div>
-
-              {/* 右侧：延迟 + 操作按钮 */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                {ping?.online && ping?.latency !== undefined && ping?.latency !== null ? (
-                  <div className={`latency-pill ${latClass}`}>
-                    <div className={`latency-dot ${latClass}`} />
-                    <span>{ping.latency === -1 ? '<1ms' : `${ping.latency}ms`}</span>
+              return (
+                <div
+                  key={server.id}
+                  className={`m3-card server-card-modern ${active ? 'active' : ''}`}
+                  onClick={() => onConnect(server)}
+                  onContextMenu={(e) => handleContextMenu(e, server)}
+                  onMouseEnter={() => setHoveredId(server.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                  title={`${server.username}@${server.host}:${server.port || 22}`}
+                  style={{
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 14,
+                    padding: '16px 18px',
+                    borderRadius: 'var(--m3-radius-lg)',
+                    background: active ? 'var(--m3-primary-container)' : 'var(--m3-surface-container)',
+                    border: active ? '1.5px solid var(--m3-primary)' : '1px solid var(--m3-outline-variant)',
+                    boxShadow: active ? '0 4px 18px rgba(15, 118, 110, 0.25)' : 'none',
+                    transition: 'all 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
+                  }}
+                >
+                  {/* OS 系统图标 */}
+                  <div style={{
+                    width: 46,
+                    height: 46,
+                    borderRadius: 'var(--m3-radius-md)',
+                    background: `linear-gradient(135deg, ${osInfo.bg}, ${osInfo.bg}dd)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 22,
+                    color: '#fff',
+                    flexShrink: 0,
+                    boxShadow: `0 4px 14px ${osInfo.bg}40`,
+                  }}>
+                    {osInfo.icon}
                   </div>
-                ) : (
-                  ping !== undefined && !ping?.online ? (
-                    <div className="latency-pill offline" title="服务器离线或不可达">
-                      <div className="latency-dot bad" />
-                      <span>离线</span>
-                    </div>
-                  ) : null
-                )}
 
-                {/* 悬浮快捷操作按钮组 */}
-                <div className="server-quick-actions">
-                  <button
-                    className="btn-action-icon"
-                    onClick={(e) => { e.stopPropagation(); onEdit(server); }}
-                    title="编辑服务器"
-                  >
-                    <Pencil size={13} />
-                  </button>
-                  {onDelete && (
-                    <button
-                      className="btn-action-icon danger"
-                      onClick={(e) => { e.stopPropagation(); onDelete(server.id); }}
-                      title="删除服务器"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  )}
+                  <div className="server-info" style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 0 }}>
+                    <div className="server-name" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {server.name || server.host}
+                      </span>
+                      {connected && (
+                        <span className="status-conn-badge" style={{
+                          background: 'rgba(16, 185, 129, 0.18)',
+                          color: '#34d399',
+                          border: '1px solid rgba(16, 185, 129, 0.4)',
+                          fontSize: '10px',
+                          padding: '1px 7px',
+                          borderRadius: 'var(--m3-radius-full)',
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4
+                        }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', boxShadow: '0 0 6px #34d399' }} />
+                          已连
+                        </span>
+                      )}
+                    </div>
+                    <div className="server-host" style={{ color: 'var(--text-3)', fontSize: 12, fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.85 }}>
+                      {server.username}@{server.host}:{server.port || 22}
+                    </div>
+                  </div>
+
+                  {/* 右侧：延迟 + 操作按钮 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                    {ping?.online && ping?.latency !== undefined && ping?.latency !== null ? (
+                      <div className={`latency-pill ${latClass}`} style={{ borderRadius: 'var(--m3-radius-full)', padding: '3px 10px', fontWeight: 600 }}>
+                        <div className={`latency-dot ${latClass}`} />
+                        <span>{ping.latency === -1 ? '<1ms' : `${ping.latency}ms`}</span>
+                      </div>
+                    ) : (
+                      ping !== undefined && !ping?.online ? (
+                        <div className="latency-pill offline" title="服务器离线" style={{ borderRadius: 'var(--m3-radius-full)', padding: '3px 10px' }}>
+                          <div className="latency-dot bad" />
+                          <span>离线</span>
+                        </div>
+                      ) : null
+                    )}
+
+                    {/* 悬浮快捷操作按钮组 */}
+                    <div className="server-quick-actions" style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        className="btn-action-icon"
+                        onClick={(e) => { e.stopPropagation(); onEdit(server); }}
+                        title="编辑"
+                        style={{ width: 28, height: 28, borderRadius: 'var(--m3-radius-sm)', background: 'var(--m3-surface-container-high)', border: '1px solid var(--m3-outline-variant)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-2)', cursor: 'pointer' }}
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      {onDelete && (
+                        <button
+                          className="btn-action-icon danger"
+                          onClick={(e) => { e.stopPropagation(); onDelete(server.id); }}
+                          title="删除"
+                          style={{ width: 28, height: 28, borderRadius: 'var(--m3-radius-sm)', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f87171', cursor: 'pointer' }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          );
+              );
         })}
       </div>
       ) : (

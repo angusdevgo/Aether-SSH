@@ -17,7 +17,7 @@ import GlobalContextMenu from './components/GlobalContextMenu.jsx';
 import { clampPanelWidth } from './components/probeFormatting.js';
 import { useTranslation } from './i18n.js';
 import { APP_VERSION } from './config.js';
-import { Settings, House, Key, Minus, Square, X, RefreshCw, Wifi, Monitor, Eye, EyeOff, LayoutGrid, List, Plus, Terminal as TerminalIcon, Folder, History, Zap, Plug, Layout } from 'lucide-react';
+import { Settings, House, Key, Minus, Square, X, RefreshCw, Wifi, Monitor, Eye, EyeOff, LayoutGrid, List, Plus, Terminal as TerminalIcon, Folder, History, Zap, Plug, Layout, Search } from 'lucide-react';
 
 import logoImg from './assets/logo.png';
 
@@ -42,6 +42,7 @@ export default function App() {
   const [monitoringEnabled, setMonitoringEnabled] = useState({}); // { [sessionId]: boolean }
   const [serverListViewMode, setServerListViewMode] = useState(localStorage.getItem('serverListViewMode') || 'grid'); // 'grid' | 'table'
   const [fileManagerPosition, setFileManagerPosition] = useState(localStorage.getItem('fileManagerPosition') || 'tab'); // 'tab' | 'right' | 'bottom'
+  const [navRailTab, setNavRailTab] = useState('servers'); // 'servers' | 'assets' | 'projects' | 'snippets' | 'settings'
   
   // ── 新增自动检测更新状态 ──────────────────────────────
   const [startupUpdateInfo, setStartupUpdateInfo] = useState(null);
@@ -624,42 +625,81 @@ export default function App() {
 
 
   return (
-    <div className="app-layout">
-      {/* ── Topbar ───────────────────────────────────────── */}
-      <div className="topbar">
-        <div className="topbar-content">
-          <div className="topbar-logo no-drag" style={{ marginLeft: 8, cursor: 'pointer' }} onClick={() => { setActiveSessionId(null); setShowSettings(false); }}>
-            <img src={logoImg} alt="logo" />
-            <div className="topbar-title" style={{ userSelect: 'none' }}>Aether</div>
-          </div>
-          
-          {sessions.length > 0 && (
-            <div className="tab-bar" style={{ flex: 1, padding: '0 16px', background: 'transparent', borderBottom: 'none', height: '100%', alignItems: 'center' }}>
-              <button 
-                className="btn btn-ghost btn-sm no-drag" 
-                onClick={() => setActiveSessionId(null)} 
-                style={{ marginRight: 8, height: '26px', display: 'flex', alignItems: 'center', gap: 4 }}
-                title="返回主页"
+    <div className="app-layout" style={{ display: 'flex', flexDirection: 'row', width: '100vw', height: '100vh', overflow: 'hidden' }}>
+      {/* ── MaidKit Style M3 Navigation Rail ────────────────────── */}
+      <div className="m3-nav-rail">
+        <div className="m3-nav-logo" onClick={() => { setActiveSessionId(null); setNavRailTab('servers'); }} title="Aether SSH">
+          <img src={logoImg} alt="Aether" style={{ width: 24, height: 24 }} />
+        </div>
+        <div className="m3-nav-group">
+          <button 
+            className={`m3-nav-item ${activeSessionId === null && navRailTab === 'servers' ? 'active' : ''}`}
+            onClick={() => { setActiveSessionId(null); setNavRailTab('servers'); }}
+            title={t('服务器大盘')}
+          >
+            <div className="m3-nav-icon-wrapper">
+              <House size={20} />
+            </div>
+            <span className="m3-nav-label">{t('服务器')}</span>
+          </button>
+          <button 
+            className={`m3-nav-item ${activeSessionId === null && navRailTab === 'assets' ? 'active' : ''}`}
+            onClick={() => { setActiveSessionId(null); setNavRailTab('assets'); }}
+            title={t('凭据与密钥')}
+          >
+            <div className="m3-nav-icon-wrapper">
+              <Key size={20} />
+            </div>
+            <span className="m3-nav-label">{t('凭据')}</span>
+          </button>
+          <button 
+            className={`m3-nav-item ${activeSessionId === null && navRailTab === 'snippets' ? 'active' : ''}`}
+            onClick={() => { setActiveSessionId(null); setNavRailTab('snippets'); }}
+            title={t('快捷指令')}
+          >
+            <div className="m3-nav-icon-wrapper">
+              <Zap size={20} />
+            </div>
+            <span className="m3-nav-label">{t('脚本')}</span>
+          </button>
+          <button 
+            className={`m3-nav-item ${activeSessionId === null && navRailTab === 'settings' ? 'active' : ''}`}
+            onClick={() => { setActiveSessionId(null); setNavRailTab('settings'); }}
+            title={t('系统设置')}
+          >
+            <div className="m3-nav-icon-wrapper">
+              <Settings size={20} />
+            </div>
+            <span className="m3-nav-label">{t('设置')}</span>
+          </button>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, overflow: 'hidden' }}>
+        {/* ── M3 Top Session TabBar ─────────────────────────────────── */}
+        <div className="topbar">
+          <div className="topbar-content">
+            <div className="m3-top-tabbar" style={{ flex: 1 }}>
+              <button
+                className={`m3-tab no-drag ${activeSessionId === null ? 'active' : ''}`}
+                onClick={() => setActiveSessionId(null)}
+                title={t('返回控制台')}
               >
-                <House size={14} />
+                <House size={15} />
+                <span>{t('控制台')}</span>
               </button>
+
               {sessions.map((s) => (
                 <div
                   key={s.id}
-                  className={`tab-item no-drag ${activeSessionId === s.id ? 'active' : ''}`}
+                  className={`m3-tab no-drag ${activeSessionId === s.id ? 'active' : ''}`}
                   onClick={() => setActiveSessionId(s.id)}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     setTabMenu({ sessionId: s.id, x: e.clientX, y: e.clientY });
                   }}
-                  style={{ height: '28px', minHeight: '28px', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
-                  <span style={{ fontSize: '10px', display: 'inline-block', lineHeight: 1 }}>
-                    {s.status === 'connecting' ? '🟡' :
-                     s.status === 'connected'  ? '🟢' :
-                     s.status === 'error'      ? '🔴' :
-                     s.status === 'closed'     ? '🔴' : '⚫'}
-                  </span>
+                  <span className={`m3-tab-dot ${s.status === 'connected' ? 'online' : ''}`} />
                   <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                     onDoubleClick={(e) => {
                       e.stopPropagation();
@@ -697,36 +737,24 @@ export default function App() {
                         reconnectSession(s);
                       }}
                       title="重新连接"
-                      style={{
-                        cursor: 'pointer',
-                        opacity: 0.6,
-                        marginLeft: '2px',
-                        marginRight: '2px',
-                        fontSize: '12px',
-                        transition: 'opacity 0.2s',
-                        userSelect: 'none'
-                      }}
-                      onMouseEnter={(e) => e.target.style.opacity = 1}
-                      onMouseLeave={(e) => e.target.style.opacity = 0.6}
+                      style={{ cursor: 'pointer', opacity: 0.6, fontSize: '12px' }}
                     >
                       ⟳
                     </span>
                   )}
                   <span
-                    className="tab-close no-drag"
+                    className="m3-tab-close no-drag"
                     onClick={(e) => {
                       e.stopPropagation();
                       closeSession(s.id, e);
                     }}
                     title="关闭标签页"
                   >
-                    <X size={12} />
+                    <X size={13} />
                   </span>
                 </div>
               ))}
             </div>
-          )}
-          {sessions.length === 0 && <div style={{ flex: 1 }}></div>}
 
           <div className="window-controls">
             <button className="btn btn-ghost btn-icon no-drag" onClick={() => setShowSettings(true)} title="设置" style={{ display: 'flex', alignItems: 'center' }}><Settings size={16} /></button>
@@ -749,8 +777,9 @@ export default function App() {
 
       {/* ── Main Area ─────────────────────────────────────── */}
       <main className="main-area">
-        <div style={{ display: activeSessionId === null ? 'flex' : 'none', flex: 1, flexDirection: 'column', height: '100%' }}>
-          <div className="dashboard-container">
+        <div style={{ display: activeSessionId === null ? 'flex' : 'none', flex: 1, flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+          {navRailTab === 'servers' && (
+          <div className="dashboard-container m3-page-animate">
             {/* 左半栏：快捷控制台 */}
             <div className="dashboard-left">
               {/* ⚡ 闪电直连卡片 */}
@@ -841,16 +870,51 @@ export default function App() {
             <div className="dashboard-right">
               {/* 🖥 全部主机目录 */}
               <div className="hosts-section-container">
-                <div className="section-title-container">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span className="section-title-icon">🖥</span>
-                    <span className="section-title">{t('主机')}</span>
-                    <div className="view-mode-toggles" style={{ display: 'flex', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 6, padding: 2 }}>
+                <div className="section-title-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className="section-title-icon" style={{ fontSize: 18 }}>🖥</span>
+                      <span className="section-title" style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)' }}>{t('主机目录')}</span>
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 'var(--m3-radius-full)', background: 'var(--m3-surface-container-high)', border: '1px solid var(--m3-outline-variant)', color: 'var(--text-3)', fontWeight: 600 }}>
+                        {filteredServers.length} {t('台节点')}
+                      </span>
+                    </div>
+
+                    {/* 搜索框 */}
+                    <div style={{ position: 'relative', width: 220, marginLeft: 8 }}>
+                      <input
+                        className="input-compact"
+                        placeholder={t('搜索服务器...')}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        style={{
+                          borderRadius: 'var(--m3-radius-full)',
+                          paddingLeft: 28,
+                          paddingRight: searchQuery ? 24 : 10,
+                          height: 32,
+                          fontSize: 12,
+                          background: 'var(--m3-surface-container-low)',
+                          border: '1px solid var(--m3-outline-variant)',
+                        }}
+                      />
+                      <Search size={14} style={{ position: 'absolute', left: 9, top: 9, color: 'var(--text-4)' }} />
+                      {searchQuery && (
+                        <button
+                          onClick={() => setSearchQuery('')}
+                          style={{ position: 'absolute', right: 8, top: 7, background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 11 }}
+                        >✕</button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {/* 视图切换按钮 */}
+                    <div className="view-mode-toggles" style={{ display: 'flex', background: 'var(--m3-surface-container-low)', border: '1px solid var(--m3-outline-variant)', borderRadius: 'var(--m3-radius-md)', padding: 2 }}>
                       <button
                         className={`btn-icon ${serverListViewMode === 'grid' ? 'active' : ''}`}
                         onClick={() => { setServerListViewMode('grid'); localStorage.setItem('serverListViewMode', 'grid'); }}
                         title="卡片视图"
-                        style={{ padding: '4px 8px', fontSize: 12, background: serverListViewMode === 'grid' ? 'var(--bg-4)' : 'transparent', color: serverListViewMode === 'grid' ? 'var(--text-1)' : 'var(--text-4)', border: 'none', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                        style={{ padding: '5px 9px', fontSize: 12, background: serverListViewMode === 'grid' ? 'var(--m3-primary-container)' : 'transparent', color: serverListViewMode === 'grid' ? 'var(--m3-on-primary-container)' : 'var(--text-4)', border: 'none', borderRadius: 'var(--m3-radius-sm)', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.15s' }}
                       >
                         <LayoutGrid size={14} />
                       </button>
@@ -858,20 +922,31 @@ export default function App() {
                         className={`btn-icon ${serverListViewMode === 'table' ? 'active' : ''}`}
                         onClick={() => { setServerListViewMode('table'); localStorage.setItem('serverListViewMode', 'table'); }}
                         title="列表视图"
-                        style={{ padding: '4px 8px', fontSize: 12, background: serverListViewMode === 'table' ? 'var(--bg-4)' : 'transparent', color: serverListViewMode === 'table' ? 'var(--text-1)' : 'var(--text-4)', border: 'none', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                        style={{ padding: '5px 9px', fontSize: 12, background: serverListViewMode === 'table' ? 'var(--m3-primary-container)' : 'transparent', color: serverListViewMode === 'table' ? 'var(--m3-on-primary-container)' : 'var(--text-4)', border: 'none', borderRadius: 'var(--m3-radius-sm)', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.15s' }}
                       >
                         <List size={14} />
                       </button>
                     </div>
+
+                    {/* 添加按钮 */}
+                    <button
+                      className="btn btn-primary btn-sm"
+                      style={{
+                        fontSize: 12,
+                        padding: '6px 16px',
+                        borderRadius: 'var(--m3-radius-full)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontWeight: 600,
+                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                      }}
+                      onClick={() => { setEditServer(null); setShowAddServer(true); }}
+                    >
+                      <Plus size={15} />
+                      {t('新建主机')}
+                    </button>
                   </div>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    style={{ marginLeft: 'auto', fontSize: 12, padding: '4px 12px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                    onClick={() => { setEditServer(null); setShowAddServer(true); }}
-                  >
-                    <Plus size={14} />
-                    {t('添加')}
-                  </button>
                 </div>
 
                 <div className="hosts-scroll-area">
@@ -889,15 +964,88 @@ export default function App() {
               </div>
             </div>
           </div>
+          )}
+
+          {/* 🔑 凭据与密钥管理页面 (Inline Panel) */}
+          {navRailTab === 'assets' && (
+            <div className="m3-page-animate" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '24px 32px', background: 'var(--m3-surface-dim)', overflowY: 'auto' }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Key size={20} /> 凭据与 SSH 密钥管理
+              </div>
+              <div style={{ display: 'flex', gap: 24, flex: 1, overflow: 'hidden' }}>
+                <div style={{ width: 280, borderRadius: 'var(--m3-radius-lg)', background: 'var(--m3-surface-container)', border: '1px solid var(--m3-outline-variant)', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[
+                    { name: 'id_rsa', path: '~/.ssh/id_rsa', type: 'RSA 4096' },
+                    { name: 'id_ed25519', path: '~/.ssh/id_ed25519', type: 'ED25519' },
+                  ].map((key, i) => (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '12px 14px', borderRadius: 'var(--m3-radius-md)',
+                      background: i === 0 ? 'var(--m3-primary-container)' : 'var(--m3-surface-container-high)',
+                      border: i === 0 ? '1px solid var(--m3-primary)' : '1px solid var(--m3-outline-variant)',
+                      cursor: 'pointer',
+                    }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 'var(--m3-radius-sm)', background: 'rgba(15,118,110,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Key size={18} style={{ color: 'var(--m3-on-primary-container)' }} /></div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', fontFamily: 'var(--font-mono)' }}>{key.path}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 2 }}>Type {key.type}</div>
+                      </div>
+                    </div>
+                  ))}
+                  <button className="btn btn-primary" style={{ marginTop: 12, borderRadius: 'var(--m3-radius-md)' }}>
+                    + 生成/导入新密钥
+                  </button>
+                </div>
+                <div className="m3-card" style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', marginBottom: 16 }}>密钥详情</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {[
+                      { label: '文件路径', value: '~/.ssh/id_ed25519' },
+                      { label: '算法类型', value: 'ED25519' },
+                      { label: '指纹 (SHA256)', value: 'SHA256:8Zk9+mX.../aether' },
+                    ].map((item, idx) => (
+                      <div key={idx} className="form-group-compact">
+                        <label style={{ fontSize: 12, color: 'var(--text-3)' }}>{item.label}</label>
+                        <input className="input-compact" readOnly value={item.value} style={{ fontFamily: 'var(--font-mono)' }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ⚡ 快捷指令与脚本页面 (Inline Panel) */}
+          {navRailTab === 'snippets' && (
+            <div className="m3-page-animate" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '24px 32px', background: 'var(--m3-surface-dim)', overflowY: 'auto' }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Zap size={20} /> 常用脚本与快捷指令
+              </div>
+              <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+                <QuickCommands addToast={addToast} />
+              </div>
+            </div>
+          )}
+
+          {/* ⚙️ 系统设置页面 (Inline Panel) */}
+          {navRailTab === 'settings' && (
+            <div className="m3-page-animate" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+              <SettingsModal
+                inline={true}
+                addToast={addToast}
+                onRestored={loadServers}
+              />
+            </div>
+          )}
         </div>
 
         <div style={{ display: activeSessionId !== null ? 'flex' : 'none', flexDirection: 'column', height: '100%', flex: 1 }}>
-            {/* Content Type Tabs */}
+            {/* Content Type Sub-Tabs (M3 Styled) */}
             {activeSession && (
-              <div className="content-tab-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 36, paddingRight: 16, borderBottom: '1px solid var(--border)', background: 'var(--bg-1)' }}>
-                <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              <div className="m3-sub-tabbar" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   <button
-                    className={`content-tab ${contentTab === 'terminal' ? 'active' : ''}`}
+                    className={`m3-sub-tab ${contentTab === 'terminal' ? 'active' : ''}`}
                     onClick={() => setContentTab('terminal')}
                   >
                     <TerminalIcon size={14} />
@@ -905,7 +1053,7 @@ export default function App() {
                   </button>
                   {fileManagerPosition === 'tab' && (
                     <button
-                      className={`content-tab ${contentTab === 'files' ? 'active' : ''}`}
+                      className={`m3-sub-tab ${contentTab === 'files' ? 'active' : ''}`}
                       onClick={() => setContentTab('files')}
                       disabled={activeSession.status !== 'connected'}
                     >
@@ -914,7 +1062,7 @@ export default function App() {
                     </button>
                   )}
                   <button
-                    className={`content-tab ${contentTab === 'history' ? 'active' : ''}`}
+                    className={`m3-sub-tab ${contentTab === 'history' ? 'active' : ''}`}
                     onClick={() => setContentTab('history')}
                     disabled={activeSession.status !== 'connected'}
                   >
@@ -922,7 +1070,7 @@ export default function App() {
                     <span>{t('历史指令')}</span>
                   </button>
                   <button
-                    className={`content-tab ${contentTab === 'quick' ? 'active' : ''}`}
+                    className={`m3-sub-tab ${contentTab === 'quick' ? 'active' : ''}`}
                     onClick={() => setContentTab('quick')}
                     disabled={activeSession.status !== 'connected'}
                   >
@@ -930,7 +1078,7 @@ export default function App() {
                     <span>{t('快捷命令')}</span>
                   </button>
                   <button
-                    className={`content-tab ${contentTab === 'forward' ? 'active' : ''}`}
+                    className={`m3-sub-tab ${contentTab === 'forward' ? 'active' : ''}`}
                     onClick={() => setContentTab('forward')}
                     disabled={activeSession.status !== 'connected'}
                   >
@@ -941,10 +1089,10 @@ export default function App() {
                 
                 {activeSession.status === 'connected' && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 11.5, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{t('文件管理器布局')}:</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{t('SFTP 布局')}:</span>
                     <select
                       className="select-compact"
-                      style={{ padding: '0 8px', fontSize: 11.5, height: 26, borderRadius: 5 }}
+                      style={{ padding: '0 8px', fontSize: 12, height: 28, borderRadius: 'var(--m3-radius-sm)', background: 'var(--m3-surface-container)', border: '1px solid var(--m3-outline)' }}
                       value={fileManagerPosition}
                       onChange={(e) => {
                         const val = e.target.value;
@@ -955,7 +1103,7 @@ export default function App() {
                         }
                       }}
                     >
-                      <option value="tab">标签页</option>
+                      <option value="tab">独立页签</option>
                       <option value="left">左侧分屏</option>
                       <option value="bottom">底部分屏</option>
                     </select>
@@ -1650,6 +1798,7 @@ export default function App() {
         );
       })()}
       <GlobalContextMenu />
+      </div>
     </div>
   );
 }
