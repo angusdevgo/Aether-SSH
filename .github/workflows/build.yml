@@ -97,7 +97,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$($env:GITHUB_REF_NAME)" `
-            --title "$($env:GITHUB_REF_NAME)" `
-            --generate-notes `
-            (Get-ChildItem dist\*.exe | ForEach-Object { $_.FullName })
+          $tag = $env:GITHUB_REF_NAME
+          # 优先取 CHANGELOG.md 中 "## <tag>" 段落作为更新日志，缺省回退自动生成
+          $notes = ''
+          if (Test-Path CHANGELOG.md) {
+            $capture = $false
+            $buf = @()
+            foreach ($line in Get-Content CHANGELOG.md -Encoding utf8) {
+              if ($line -match '^##\s') {
+                $capture = ($line -match ('^##\s+' + [regex]::Escape($tag) + '\b'))
+                continue
+              }
+              if ($capture) { $buf += $line }
+            }
+            $notes = ($buf -join "`n").Trim()
+          }
+          $files = (Get-ChildItem dist\*.exe | ForEach-Object { $_.FullName })
+          if ($notes) {
+            Set-Content -Path release_notes.md -Value $notes -Encoding utf8
+            gh release create "$tag" --title "$tag" --notes-file release_notes.md $files
+          } else {
+            Write-Host "WARNING: no CHANGELOG.md section for $tag, using auto-generated notes"
+            gh release create "$tag" --title "$tag" --generate-notes $files
+          }
