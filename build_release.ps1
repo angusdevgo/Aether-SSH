@@ -1,4 +1,4 @@
-$wailsJson = Get-Content "wails.json" | ConvertFrom-Json
+﻿$wailsJson = Get-Content "wails.json" | ConvertFrom-Json
 $version = $wailsJson.info.productVersion
 
 Write-Host "Start AetherSSH packaging process: V$version" -ForegroundColor Cyan

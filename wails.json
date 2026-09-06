@@ -12,7 +12,7 @@
   "info": {
     "companyName": "Aether",
     "productName": "Aether",
-    "productVersion": "1.1.8",
+    "productVersion": "1.1.9",
     "copyright": "Copyright 2024",
     "comments": "Lightweight SSH Client"
   }
