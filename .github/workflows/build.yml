@@ -1,0 +1,95 @@
+name: Build Aether
+
+# 推送到 main 自动构建便携版 + 安装包（产物在 Actions 页面下载，保留 30 天）；
+# 推送 V* 标签（如 V1.1.9）时额外创建 GitHub Release 并上传两个 exe。
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'V*' ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Wails CLI
+        shell: pwsh
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
+
+      - name: Install NSIS
+        shell: pwsh
+        run: choco install nsis -y --no-progress
+
+      - name: Add NSIS to PATH
+        shell: pwsh
+        run: Add-Content $env:GITHUB_PATH 'C:\Program Files (x86)\NSIS'
+
+      - name: Read version from wails.json
+        id: ver
+        shell: pwsh
+        run: |
+          $w = Get-Content wails.json | ConvertFrom-Json
+          "version=$($w.info.productVersion)" >> $env:GITHUB_OUTPUT
+
+      - name: Go tests
+        shell: pwsh
+        run: go test ./...
+
+      - name: Frontend tests
+        shell: pwsh
+        run: |
+          Push-Location frontend
+          npm test
+          Pop-Location
+
+      # 一次构建同时产出 build\bin\Aether.exe 与 Aether-amd64-installer.exe
+      - name: Build (portable + NSIS installer)
+        shell: pwsh
+        run: wails build -clean -nsis
+
+      - name: Collect artifacts
+        shell: pwsh
+        run: |
+          $ver = '${{ steps.ver.outputs.version }}'
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item build\bin\Aether.exe "dist\Aether_Portable_V$ver.exe"
+          Copy-Item build\bin\Aether-amd64-installer.exe "dist\Aether_Setup_V$ver.exe"
+          Get-ChildItem dist
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aether_V${{ steps.ver.outputs.version }}
+          path: dist/*.exe
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Create Release (V* tags only)
+        if: startsWith(github.ref, 'refs/tags/V')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$($env:GITHUB_REF_NAME)" `
+            --title "$($env:GITHUB_REF_NAME)" `
+            --generate-notes `
+            (Get-ChildItem dist\*.exe | ForEach-Object { $_.FullName })
