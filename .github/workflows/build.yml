@@ -50,6 +50,14 @@ jobs:
           $w = Get-Content wails.json | ConvertFrom-Json
           "version=$($w.info.productVersion)" >> $env:GITHUB_OUTPUT
 
+      - name: Build frontend (generate embedded dist)
+        shell: pwsh
+        run: |
+          Push-Location frontend
+          npm ci
+          npm run build
+          Pop-Location
+
       - name: Go tests
         shell: pwsh
         run: go test ./...
