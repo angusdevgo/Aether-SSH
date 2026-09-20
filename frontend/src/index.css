@@ -266,7 +266,7 @@ a { color: var(--blue); text-decoration: none; }
   color: var(--blue);
 }
 
-.input {
+.input, .select, textarea.input {
   width: 100%;
   background: var(--bg-0);
   border: 1px solid var(--border);
@@ -275,25 +275,50 @@ a { color: var(--blue); text-decoration: none; }
   border-radius: var(--radius-sm);
   font-size: 13px;
   transition: var(--transition);
+  box-sizing: border-box;
 }
-.input:focus {
+.input:focus, .select:focus, textarea.input:focus {
   outline: none;
-  border-color: var(--blue);
-  box-shadow: 0 0 0 2px var(--blue-dim);
+  border-color: var(--green);
+  box-shadow: 0 0 0 2px var(--green-dim);
   background: var(--bg-1);
 }
-.input:disabled { opacity: 0.6; cursor: not-allowed; }
+.input:disabled, .select:disabled, textarea.input:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.select {
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+.select option {
+  background: var(--bg-2);
+  color: var(--text-1);
+  padding: 8px;
+}
 
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
+  position: relative;
 }
 .form-label {
   font-size: 12px;
   font-weight: 500;
-  color: var(--text-3);
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.form-required {
+  color: var(--red, #ef4444);
+  font-weight: 600;
+  margin-left: 2px;
 }
 
 /* ── Main Layout ─────────────────────────────────────────────── */
@@ -1995,38 +2020,215 @@ a { color: var(--blue); text-decoration: none; }
   .modal-overlay { animation: none; }
 }
 
-/* ── Glass Modal Overrides ── */
+/* ── Complete Modal & Dialog Design System ── */
+@keyframes modalOverlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalPopIn {
+  from { opacity: 0; transform: scale(0.96) translateY(12px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
 .modal-overlay { 
   position: fixed !important; 
   inset: 0 !important; 
   display: flex !important; 
   align-items: center !important; 
   justify-content: center !important; 
-  background: rgba(0, 0, 0, 0.5) !important;
-  backdrop-filter: blur(8px) !important; 
-  -webkit-backdrop-filter: blur(8px) !important; 
+  background: rgba(0, 0, 0, 0.65) !important;
+  backdrop-filter: blur(12px) !important; 
+  -webkit-backdrop-filter: blur(12px) !important; 
   z-index: 1000 !important;
+  padding: 20px !important;
+  box-sizing: border-box !important;
+  animation: modalOverlayFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .modal { 
-  width: 90% !important;
+  width: 92% !important;
   max-width: 480px !important;
-  max-height: 90vh !important;
+  max-height: calc(100vh - 48px) !important;
+  height: auto !important;
   display: flex !important;
   flex-direction: column !important;
-  background: var(--glass-bg) !important; 
-  backdrop-filter: var(--glass-blur) !important; 
-  border: 1px solid var(--glass-border) !important; 
-  box-shadow: 0 20px 40px rgba(0,0,0,0.4) !important; 
+  background: var(--bg-1) !important; 
+  background: rgba(20, 22, 34, 0.96) !important;
+  backdrop-filter: blur(28px) !important; 
+  -webkit-backdrop-filter: blur(28px) !important; 
+  border: 1px solid rgba(255, 255, 255, 0.1) !important; 
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), 0 0 1px 1px rgba(255, 255, 255, 0.05) !important; 
   border-radius: 16px !important; 
   overflow: hidden !important; 
   position: relative !important;
+  animation: modalPopIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
-.modal-md { max-width: 600px !important; width: 600px !important; }
-.modal-xl { max-width: 860px !important; width: 860px !important; height: 75vh !important; }
+.modal-sm { max-width: 400px !important; width: 400px !important; }
+.modal-md { max-width: 580px !important; width: 580px !important; }
+.modal-lg { max-width: 720px !important; width: 720px !important; }
+.modal-xl { max-width: 880px !important; width: 880px !important; height: 80vh !important; }
 
-.modal-header { background: var(--bg-2) !important; border-bottom: 1px solid var(--border) !important; padding: 16px 20px !important; }
+/* 确保内部表单成为弹性容器，永不溢出视口 */
+.modal > form {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.modal-header { 
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  background: var(--bg-2) !important; 
+  border-bottom: 1px solid var(--border) !important; 
+  padding: 16px 22px !important; 
+  flex-shrink: 0 !important;
+}
+
+.modal-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: var(--text-1) !important;
+  letter-spacing: 0.2px !important;
+}
+
+.modal-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 20px 22px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  box-sizing: border-box !important;
+}
+
+/* 模态框独立微质感细滚动条 */
+.modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+.modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.modal-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 9999px;
+}
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.modal-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 12px !important;
+  padding: 14px 22px !important;
+  background: var(--bg-2) !important;
+  border-top: 1px solid var(--border) !important;
+  flex-shrink: 0 !important;
+}
+
+/* ── 全局表单分块卡片 ── */
+.form-section {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.2s, background-color 0.2s;
+  box-sizing: border-box;
+}
+.form-section:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.form-section-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.3px;
+  margin-bottom: 2px;
+}
+
+/* 表单行并排网格 */
+.form-row {
+  display: flex !important;
+  gap: 12px !important;
+  align-items: flex-start !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+.form-row > .form-group {
+  margin-bottom: 0 !important;
+}
+.form-row > .form-group:first-child {
+  flex: 1 1 auto !important;
+}
+.form-row > .form-group.form-col-port,
+.form-row > .form-group:last-child:not(:first-child) {
+  width: 110px !important;
+  flex-shrink: 0 !important;
+}
+
+/* 输入框后缀操作按钮容器 */
+.input-suffix-wrapper {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+.input-suffix-wrapper .input {
+  padding-right: 38px !important;
+}
+.input-suffix-btn {
+  position: absolute !important;
+  right: 8px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  background: none !important;
+  border: none !important;
+  color: var(--text-3) !important;
+  cursor: pointer !important;
+  padding: 5px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  transition: all 0.15s !important;
+  line-height: 1 !important;
+}
+.input-suffix-btn:hover {
+  color: var(--text-1) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 私钥文本框专业等宽排版 */
+.textarea-private-key {
+  font-family: var(--font-mono) !important;
+  font-size: 11.5px !important;
+  line-height: 1.45 !important;
+  min-height: 90px !important;
+  max-height: 150px !important;
+  resize: vertical !important;
+  white-space: pre !important;
+  word-break: normal !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}
+
 .settings-sidebar { background: var(--bg-0) !important; border-right: 1px solid var(--border) !important; }
 .settings-content { background: transparent !important; }
 

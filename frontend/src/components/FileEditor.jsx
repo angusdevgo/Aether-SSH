@@ -54,6 +54,17 @@ export default function FileEditor({ file, onSave, onClose, mode = 'modal' }) {
     onClose();
   };
 
+  useEffect(() => {
+    if (mode === 'split') return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mode, modified, onClose]);
+
   const lang = getLanguage(file.name);
   const ext = (file.name.split('.').pop() || '').toLowerCase();
 

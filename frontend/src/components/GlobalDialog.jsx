@@ -73,12 +73,35 @@ export default function GlobalDialog() {
 function DialogContent({ current, onClose, onConfirm }) {
   const [inputValue, setInputValue] = useState(current.defaultValue || '');
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === 'Enter' && current.type !== 'prompt') {
+        if (current.type === 'confirm') onConfirm(true);
+        else onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [current, onClose, onConfirm]);
+
   return (
-    <div className="modal modal-sm" style={{ padding: 32, textAlign: 'center' }}>
-      <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', marginBottom: 16 }}>
+    <div className="modal modal-sm" style={{ padding: '28px 24px', textAlign: 'center', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', marginBottom: 14, flexShrink: 0 }}>
         {current.title}
       </div>
-      <div style={{ fontSize: 14, color: 'var(--text-3)', marginBottom: 28, lineHeight: 1.6, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+      <div style={{
+        fontSize: 13.5,
+        color: 'var(--text-2)',
+        marginBottom: current.type === 'prompt' ? 16 : 24,
+        lineHeight: 1.6,
+        wordBreak: 'break-word',
+        overflowWrap: 'anywhere',
+        maxHeight: '45vh',
+        overflowY: 'auto',
+        padding: '0 4px',
+      }}>
         {current.message}
       </div>
       
@@ -86,7 +109,7 @@ function DialogContent({ current, onClose, onConfirm }) {
         <input 
           autoFocus
           className="input" 
-          style={{ width: '100%', marginBottom: 28, textAlign: 'center', fontSize: 16, padding: '12px 16px' }}
+          style={{ width: '100%', marginBottom: 24, textAlign: 'center', fontSize: 14.5, padding: '10px 14px' }}
           value={inputValue}
           onChange={e => setInputValue(e.target.value)}
           onKeyDown={e => {
@@ -96,9 +119,11 @@ function DialogContent({ current, onClose, onConfirm }) {
         />
       )}
 
-      <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 'auto', flexShrink: 0 }}>
         {current.type !== 'alert' && (
-          <button className="btn btn-secondary" onClick={onClose} style={{ flex: 1, padding: '10px 0', justifyContent: 'center' }}>取消</button>
+          <button className="btn btn-secondary" onClick={onClose} style={{ flex: 1, height: 36, justifyContent: 'center', fontSize: 13 }}>
+            取消
+          </button>
         )}
         <button 
           className="btn btn-primary"
@@ -107,7 +132,7 @@ function DialogContent({ current, onClose, onConfirm }) {
             else if (current.type === 'confirm') onConfirm(true);
             else onClose();
           }}
-          style={current.type === 'alert' ? { minWidth: 120, justifyContent: 'center' } : { flex: 1, padding: '10px 0', justifyContent: 'center' }}
+          style={current.type === 'alert' ? { minWidth: 120, height: 36, justifyContent: 'center', fontSize: 13, fontWeight: 600 } : { flex: 1, height: 36, justifyContent: 'center', fontSize: 13, fontWeight: 600 }}
         >
           {current.type === 'alert' ? '我知道了' : '确定'}
         </button>

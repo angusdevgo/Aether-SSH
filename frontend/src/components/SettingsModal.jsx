@@ -146,6 +146,17 @@ export default function SettingsModal({ onClose, addToast, onRestored, inline = 
     return () => window.removeEventListener('app-update-progress', handleProgress);
   }, []);
 
+  useEffect(() => {
+    if (inline) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [inline, onClose]);
+
   const handleCheckUpdate = async () => {
     setCheckingUpdate(true);
     try {
