@@ -294,10 +294,29 @@ func (m *SSHManager) Connect(sessionId string, conn Connection) error {
 	go m.pipeOutput(sessionId, stdout, historyStream)
 	go m.pipeOutput(sessionId, stderr, nil)
 
-	// 启动后台连接意外断开监控协程
+	// 启动后台连接意外断开监控协程：
+	// 关键：当用户在终端内执行 exit / logout，或者远端进程终止时，session.Wait() 会立即返回！
+	// 如果只等待 client.Wait()，由于 SFTP 或其他通道（如端口转发、并发连接通道）依然可能未被关闭，
+	// client 内部的 TCP 连接不会立刻关闭，导致前端必须等待数十秒甚至更久才能感知断开。
 	go func() {
-		_ = client.Wait()
-		// 检测是否已被主动移除，若未被移除，说明是意外断开
+		sessionDone := make(chan struct{})
+		go func() {
+			_ = session.Wait()
+			close(sessionDone)
+		}()
+
+		clientDone := make(chan struct{})
+		go func() {
+			_ = client.Wait()
+			close(clientDone)
+		}()
+
+		select {
+		case <-sessionDone:
+		case <-clientDone:
+		}
+
+		// 检测是否已被主动移除，若未被移除，说明是远端退出或意外断开
 		m.mu.Lock()
 		_, exists := m.sessions[sessionId]
 		m.mu.Unlock()
