@@ -2390,19 +2390,28 @@ a { color: var(--blue); text-decoration: none; }
 }
 
 .m3-tab-close {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0.5;
+  opacity: 0.6;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer !important;
+  color: inherit;
   transition: all 0.15s ease;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  --wails-draggable: no-drag !important;
+  pointer-events: auto !important;
 }
 
 .m3-tab-close:hover {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(239, 68, 68, 0.2);
   color: var(--red);
 }
 

@@ -60,9 +60,10 @@ export function useSessions(addToast, onConnected) {
     }
   }, [addToast, onConnected]);
 
-  const closeSession = useCallback(async (sessionId, e) => {
+  const closeSession = useCallback((sessionId, e) => {
     e?.stopPropagation?.();
-    try { await AppGo.DisconnectSSH(sessionId); } catch (_) {}
+    e?.preventDefault?.();
+    // 立即乐观更新前端状态，销毁标签页与终端 DOM，保证绝不卡死
     setSessions(prev => {
       const remaining = prev.filter(s => s.id !== sessionId);
       setActiveSessionId(activeId => {
@@ -73,6 +74,11 @@ export function useSessions(addToast, onConnected) {
       });
       return remaining;
     });
+    // 后台异步安全断开 SSH 连接并设置超时保护，防止底层阻塞卡死
+    Promise.race([
+      AppGo.DisconnectSSH(sessionId),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+    ]).catch(() => {});
   }, []);
 
   return {

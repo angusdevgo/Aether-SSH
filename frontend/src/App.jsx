@@ -740,16 +740,22 @@ export default function App() {
                       ⟳
                     </span>
                   )}
-                  <span
+                  <button
+                    type="button"
                     className="m3-tab-close no-drag"
                     onClick={(e) => {
                       e.stopPropagation();
+                      e.preventDefault();
                       closeSession(s.id, e);
                     }}
-                    title="关闭标签页"
+                    onMouseDown={(e) => {
+                      // 阻止拖拽和事件冒泡，防止顶栏窗口拖拽拦截点击
+                      e.stopPropagation();
+                    }}
+                    title={t('关闭标签页') || '关闭标签页'}
                   >
                     <X size={13} />
-                  </span>
+                  </button>
                 </div>
               ))}
             </div>

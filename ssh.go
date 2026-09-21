@@ -517,6 +517,9 @@ func (m *SSHManager) Resize(sessionId string, cols, rows int) {
 
 // executeCmd executes a command on a separate temporary session to avoid blocking the main PTY
 func (m *SSHManager) executeCmd(s *SessionData, cmd string) (string, error) {
+	if s.Client == nil {
+		return "", fmt.Errorf("ssh client is nil")
+	}
 	session, err := s.Client.NewSession()
 	if err != nil {
 		return "", err
@@ -525,8 +528,19 @@ func (m *SSHManager) executeCmd(s *SessionData, cmd string) (string, error) {
 
 	var stdoutBuf bytes.Buffer
 	session.Stdout = &stdoutBuf
-	err = session.Run(cmd)
-	return stdoutBuf.String(), err
+
+	done := make(chan error, 1)
+	go func() {
+		done <- session.Run(cmd)
+	}()
+
+	select {
+	case err = <-done:
+		return stdoutBuf.String(), err
+	case <-time.After(5 * time.Second):
+		session.Close()
+		return "", fmt.Errorf("command execution timed out")
+	}
 }
 
 // execOnce 建立一次性 SSH 连接执行单条命令并返回输出（不创建持久会话），
