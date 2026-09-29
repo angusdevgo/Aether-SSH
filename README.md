@@ -80,3 +80,15 @@ Aether 不仅仅是一个 SSH 客户端，它是一套为了消除繁杂运维�
 ## 🤝 友情链接
 
 - [LINUX DO](https://linux.do/) - 新一代 Linux 开源技术社区
+
+---
+
+## ⭐ Star History
+
+<a href="https://star-history.com/#angusdevgo/Aether-SSH&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=angusdevgo/Aether-SSH&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=angusdevgo/Aether-SSH&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=angusdevgo/Aether-SSH&type=Date" />
+ </picture>
+</a>
